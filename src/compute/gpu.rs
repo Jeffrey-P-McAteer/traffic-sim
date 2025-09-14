@@ -5,10 +5,10 @@ use opencl3::{
     memory::{Buffer, CL_MEM_READ_WRITE, CL_MEM_READ_ONLY},
     program::Program,
     command_queue::{CommandQueue, CL_QUEUE_PROFILING_ENABLE},
-    types::{CL_TRUE, cl_float},
+    types::CL_TRUE,
 };
 
-use crate::simulation::{SimulationState, TrafficManager, Car, CarId};
+use crate::simulation::{SimulationState, TrafficManager, Car};
 use crate::config::{CarsConfig, RouteConfig};
 use anyhow::{Result, anyhow};
 use super::SimulationBackend;

@@ -1,6 +1,6 @@
 use winit::event::{ElementState, MouseButton, MouseScrollDelta};
 use winit::keyboard::{KeyCode, PhysicalKey};
-use nalgebra::{Matrix4, Vector3, Point3};
+use nalgebra::{Matrix4, Vector3};
 
 pub struct Viewport {
     // Camera properties

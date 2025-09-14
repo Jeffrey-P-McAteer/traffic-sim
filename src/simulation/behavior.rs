@@ -1,4 +1,4 @@
-use super::{Car, CarId, SimulationState, BehaviorState};
+use super::{Car, SimulationState, BehaviorState};
 use crate::config::{DriverBehavior, CarsConfig, RouteConfig};
 use rand::{Rng, SeedableRng};
 use rand_distr::{Normal, Distribution};

@@ -1,4 +1,4 @@
-use super::{Car, CarId, SimulationState, BehaviorState, BehaviorEngine};
+use super::{Car, CarId, SimulationState, BehaviorEngine};
 use crate::config::{CarsConfig, RouteConfig, CarType};
 use nalgebra::{Point2, Vector2};
 use rand::{Rng, SeedableRng};
@@ -25,14 +25,17 @@ impl TrafficManager {
             StdRng::from_entropy()
         };
         
-        // Initialize spawn timers
+        // Initialize spawn timers based on spawn_rate
         let mut spawn_timers = HashMap::new();
+        let base_interval = 1.0 / cars_config.simulation.spawn_rate; // Convert rate to interval
+        
         for entry in &route.route.entries {
+            // Use entry-specific intervals if configured, otherwise use spawn rate
             let interval = cars_config.traffic_flow.entry_intervals
                 .iter()
                 .find(|ei| ei.entry_id == entry.id)
                 .map(|ei| rng.clone().gen_range(ei.min_interval..=ei.max_interval))
-                .unwrap_or(5.0); // Default 5 second interval
+                .unwrap_or(base_interval); // Use spawn_rate as default
             spawn_timers.insert(entry.id.clone(), interval);
         }
         
@@ -81,6 +84,7 @@ impl TrafficManager {
                         spawn_requests.push((entry_id.clone(), entry.clone()));
                         
                         // Reset timer with random interval
+                        let base_interval = 1.0 / self.cars_config.simulation.spawn_rate;
                         let entry_interval = self.cars_config.traffic_flow.entry_intervals
                             .iter()
                             .find(|ei| &ei.entry_id == entry_id);
@@ -88,7 +92,7 @@ impl TrafficManager {
                         *timer = if let Some(interval) = entry_interval {
                             self.rng.gen_range(interval.min_interval..=interval.max_interval)
                         } else {
-                            5.0
+                            base_interval // Use spawn_rate as default
                         };
                     }
                 }
@@ -117,14 +121,17 @@ impl TrafficManager {
         );
         
         // Check if there's space at the entry point
-        let min_spawn_distance = 20.0; // Minimum distance from other cars
+        let min_spawn_distance = 10.0; // Minimum distance from other cars (reduced from 20.0)
         
         for car in &state.cars {
             let distance = (car.position - entry_pos).magnitude();
             if distance < min_spawn_distance {
+                log::debug!("Cannot spawn at entry {} - car too close ({:.1}m < {:.1}m)", entry.id, distance, min_spawn_distance);
                 return false;
             }
         }
+        
+        log::debug!("Can spawn at entry {} - no blocking cars", entry.id);
         
         true
     }

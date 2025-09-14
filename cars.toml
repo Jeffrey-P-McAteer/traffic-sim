@@ -3,7 +3,7 @@
 
 [simulation]
 total_cars = 100
-spawn_rate = 0.5      # cars per second
+spawn_rate = 2.0      # cars per second
 simulation_duration = 300.0  # seconds
 
 # Car type definitions with different characteristics
@@ -99,8 +99,8 @@ lateral_safety_margin = 0.5 # meters for lane changes
 # Traffic flow parameters
 [traffic_flow]
 entry_intervals = [
-    { entry_id = "entry_1", min_interval = 2.0, max_interval = 8.0 },
-    { entry_id = "entry_2", min_interval = 3.0, max_interval = 10.0 }
+    { entry_id = "entry_1", min_interval = 1.0, max_interval = 3.0 },
+    { entry_id = "entry_2", min_interval = 1.0, max_interval = 3.0 }
 ]
 
 # Random seed for reproducible simulations

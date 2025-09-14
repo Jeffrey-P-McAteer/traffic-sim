@@ -1,4 +1,4 @@
-use super::{Car, CarId, Vec2, Point, SimulationState};
+use super::{Car, Vec2, Point, SimulationState};
 use crate::config::{RouteConfig, CollisionAvoidance};
 use nalgebra::{Point2, Vector2};
 use std::f32::consts::PI;
@@ -19,10 +19,16 @@ impl PhysicsEngine {
     pub fn update(&self, state: &mut SimulationState) {
         let dt = state.dt;
         
+        if !state.cars.is_empty() {
+            log::debug!("Physics engine updating {} cars with dt={:.3}", state.cars.len(), dt);
+        }
+        
         // Update car physics in parallel-safe manner
         let mut updates = Vec::with_capacity(state.cars.len());
         
         for car in &state.cars {
+            log::debug!("Car {}: pos=({:.1},{:.1}) vel=({:.1},{:.1})", 
+                        car.id.0, car.position.x, car.position.y, car.velocity.x, car.velocity.y);
             let update = self.calculate_car_update(car, state, dt);
             updates.push((car.id, update));
         }
@@ -132,11 +138,8 @@ impl PhysicsEngine {
         
         let new_velocity = tangent_dir * tangential_speed + radial_component;
         
-        // Update position
-        let new_position = center + Vector2::new(
-            lerp_radius * current_angle.cos(),
-            lerp_radius * current_angle.sin()
-        ) + new_velocity * dt;
+        // Update position by integrating velocity
+        let new_position = car.position + new_velocity * dt;
         
         // Calculate acceleration vector
         let acceleration = if dt > 0.0 {

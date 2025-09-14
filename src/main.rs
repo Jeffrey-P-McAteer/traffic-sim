@@ -4,7 +4,7 @@ use std::time::Instant;
 use clap::{Parser, ValueEnum};
 use winit::{
     event::*,
-    event_loop::{ControlFlow, EventLoop},
+    event_loop::EventLoop,
 };
 
 use traffic_sim::{
@@ -37,6 +37,10 @@ struct Args {
     /// Run in console mode (no graphics)
     #[arg(long)]
     console: bool,
+    
+    /// Enable verbose logging for detailed simulation progress
+    #[arg(short, long)]
+    verbose: bool,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
@@ -57,6 +61,7 @@ struct Application {
     target_fps: f32,
     simulation_speed: f32,
     console_mode: bool,
+    verbose: bool,
 }
 
 impl Application {
@@ -66,10 +71,28 @@ impl Application {
         info!("Starting Traffic Simulator");
         
         // Load configuration
+        if args.verbose {
+            info!("Loading route configuration from: {}", &args.route);
+        }
         let config = SimulationConfig::load_from_files(&args.route, &args.cars)?;
         info!("Loaded configuration: {} cars max, route: {}", 
               config.cars.simulation.total_cars, 
               config.route.route.name);
+        
+        if args.verbose {
+            info!("Route details: {} lanes, {:.1}m inner radius, {:.1}m outer radius", 
+                  config.route.route.geometry.lane_count,
+                  config.route.route.geometry.inner_radius,
+                  config.route.route.geometry.outer_radius);
+            info!("Traffic rules: {:.1} km/h speed limit, {:.1}m following distance", 
+                  config.route.route.traffic_rules.speed_limit * 3.6,
+                  config.route.route.traffic_rules.following_distance);
+            info!("Car types loaded: {}", config.cars.car_types.len());
+            info!("Behavior patterns loaded: {}", config.cars.behavior.len());
+            info!("Spawn configuration: {} total cars, {:.1} cars/s spawn rate", 
+                  config.cars.simulation.total_cars,
+                  config.cars.simulation.spawn_rate);
+        }
         
         // Initialize graphics system (if not console mode)
         let graphics = if args.console {
@@ -143,6 +166,12 @@ impl Application {
             info!("Random Seed: {}", seed);
         }
         
+        if args.verbose {
+            info!("Verbose logging enabled - detailed simulation progress will be shown");
+            info!("Physics timestep: {:.3}s ({:.1} Hz)", dt, 1.0 / dt);
+            info!("Performance tracking: {} samples", config.cars.performance.timing_samples);
+        }
+        
         Ok(Self {
             graphics,
             simulation_state,
@@ -153,6 +182,7 @@ impl Application {
             target_fps: 60.0,
             simulation_speed: 1.0,
             console_mode: args.console,
+            verbose: args.verbose,
         })
     }
     
@@ -165,7 +195,21 @@ impl Application {
             let original_dt = self.simulation_state.dt;
             self.simulation_state.dt = original_dt * self.simulation_speed;
             
+            // Verbose logging for simulation state changes
+            let prev_car_count = self.simulation_state.active_cars as usize;
+            
             self.compute_backend.update(&mut self.simulation_state)?;
+            
+            // Update active car count and log changes
+            self.simulation_state.active_cars = self.simulation_state.cars.len() as u32;
+            
+            if self.verbose && self.simulation_state.cars.len() != prev_car_count {
+                if self.simulation_state.cars.len() > prev_car_count {
+                    log::debug!("Car spawned: total cars = {}", self.simulation_state.cars.len());
+                } else if self.simulation_state.cars.len() < prev_car_count {
+                    log::debug!("Car despawned: total cars = {}", self.simulation_state.cars.len());
+                }
+            }
             
             // Restore original timestep
             self.simulation_state.dt = original_dt;
@@ -301,6 +345,15 @@ async fn run_graphics_mode(args: Args) -> Result<()> {
                                     info!("Close requested");
                                     control_flow.exit();
                                 }
+                                WindowEvent::RedrawRequested => {
+                                    if let Err(e) = app.update() {
+                                        log::error!("Update error: {}", e);
+                                    }
+                                    
+                                    if let Err(e) = app.render() {
+                                        log::error!("Render error: {}", e);
+                                    }
+                                }
                                 WindowEvent::Resized(_physical_size) => {
                                     // Handled in graphics system
                                 }
@@ -309,19 +362,6 @@ async fn run_graphics_mode(args: Args) -> Result<()> {
                                 }
                                 _ => {}
                             }
-                        }
-                    }
-                }
-            }
-            Event::WindowEvent { event: WindowEvent::RedrawRequested, window_id } => {
-                if let Some(ref graphics) = app.graphics {
-                    if window_id == graphics.window.id() {
-                        if let Err(e) = app.update() {
-                            log::error!("Update error: {}", e);
-                        }
-                        
-                        if let Err(e) = app.render() {
-                            log::error!("Render error: {}", e);
                         }
                     }
                 }
@@ -366,12 +406,27 @@ async fn run_console_mode(args: Args) -> Result<()> {
         if last_status.elapsed().as_secs() >= 1 {
             let elapsed = start_time.elapsed();
             let fps = app.performance_tracker.fps();
-            info!("Frame {}: {} cars active, {:.1} FPS, Elapsed: {:.1}s", 
-                  frame_count,
-                  app.simulation_state.active_cars,
-                  fps,
-                  elapsed.as_secs_f32()
-            );
+            if app.verbose {
+                info!("Frame {}: {} cars active, {} total spawned, {:.1} FPS, Sim time: {:.1}s, Elapsed: {:.1}s", 
+                      frame_count,
+                      app.simulation_state.active_cars,
+                      app.simulation_state.total_spawned,
+                      fps,
+                      app.simulation_state.time,
+                      elapsed.as_secs_f32()
+                );
+                info!("  Performance: Sim {:.2}ms/frame, Frame {:.2}ms total",
+                      app.performance_tracker.average_simulation_time().as_secs_f32() * 1000.0,
+                      app.performance_tracker.average_frame_time().as_secs_f32() * 1000.0
+                );
+            } else {
+                info!("Frame {}: {} cars active, {:.1} FPS, Elapsed: {:.1}s", 
+                      frame_count,
+                      app.simulation_state.active_cars,
+                      fps,
+                      elapsed.as_secs_f32()
+                );
+            }
             last_status = Instant::now();
         }
         
