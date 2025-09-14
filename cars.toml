@@ -72,7 +72,7 @@ reaction_time = 1.2
 exit_probability = 0.25
 
 [behavior.cautious]
-name = "Cautious Driver" 
+name = "Cautious Driver"
 weight = 20
 following_distance_factor = 1.5
 lane_change_frequency = 0.3

@@ -32,35 +32,43 @@ impl UiRenderer {
             0.0
         };
         
-        // In a real UI implementation, this would render text overlays on the screen
-        // For now, we output to console with comprehensive status information
-        
+        // Create text overlays for GUI rendering in lower-left corner
         let status = if paused { "PAUSED" } else { "RUNNING" };
         
-        println!("\n╔═══════════════════════════════════════════════════════════════╗");
-        println!("║                    TRAFFIC SIMULATION STATUS                  ║");
-        println!("╠═══════════════════════════════════════════════════════════════╣");
-        println!("║ Status: {:8} │ Frame: {:10} │ Speed: {:6.2}x      ║", status, frame_count, simulation_speed);
-        println!("║ Cars:   {:3}/{:<8} │ Time:  {:10.1}s │ FPS:   {:6.1}      ║", 
-                 state.active_cars, state.total_spawned, state.time, fps);
-        println!("╠═══════════════════════════════════════════════════════════════╣");
-        println!("║ Route File: {:<49} ║", route_file);
-        println!("║ Cars File:  {:<49} ║", cars_file);
-        println!("╠═══════════════════════════════════════════════════════════════╣");
-        println!("║                       VIEWPORT CONTROLS                       ║");
-        println!("║ Current Position: ({:6.0}, {:6.0}) │ Zoom: {:6.2}x            ║", 
-                 viewport.get_position().x, viewport.get_position().y, viewport.get_zoom());
-        println!("║ Mouse Drag: Pan view        │ Mouse Wheel: Zoom in/out       ║");
-        println!("║ WASD/Arrow Keys: Move camera │ +/- Keys: Zoom in/out         ║");
-        println!("║ Home: Reset view to center  │                                ║");
-        println!("╠═══════════════════════════════════════════════════════════════╣");
-        println!("║                      SIMULATION CONTROLS                     ║");
-        println!("║ SPACE: Pause/Resume         │ R: Reset simulation            ║");
-        println!("║ 1-5: Set speed (0.25x-4x)  │ F1: Toggle performance display ║");
-        println!("║ ESC: Exit simulation        │                                ║");
-        println!("╚═══════════════════════════════════════════════════════════════╝");
+        let overlays = vec![
+            // Status section
+            TextOverlay::new(format!("Status: {}", status), 15.0, 15.0),
+            TextOverlay::new(format!("Cars: {}/{}", state.active_cars, state.total_spawned), 15.0, 35.0),
+            TextOverlay::new(format!("Time: {:.1}s", state.time), 15.0, 55.0),
+            TextOverlay::new(format!("Speed: {:.2}x", simulation_speed), 15.0, 75.0),
+            TextOverlay::new(format!("FPS: {:.0}", fps), 15.0, 95.0),
+            TextOverlay::new(format!("Frame: {}", frame_count), 15.0, 115.0),
+            
+            // Files section
+            TextOverlay::new(format!("Route: {}", route_file), 15.0, 145.0),
+            TextOverlay::new(format!("Cars: {}", cars_file), 15.0, 165.0),
+            
+            // Camera info
+            TextOverlay::new(format!("Zoom: {:.2}x", viewport.get_zoom()), 15.0, 195.0),
+            TextOverlay::new(format!("Pos: ({:.0}, {:.0})", 
+                           viewport.get_position().x, viewport.get_position().y), 15.0, 215.0),
+            
+            // Controls help
+            TextOverlay::new("=== CONTROLS ===".to_string(), 15.0, 245.0),
+            TextOverlay::new("Mouse: Drag=pan, Wheel=zoom".to_string(), 15.0, 265.0),
+            TextOverlay::new("WASD/Arrows: Move camera".to_string(), 15.0, 285.0),
+            TextOverlay::new("Home: Reset view".to_string(), 15.0, 305.0),
+            TextOverlay::new("Space: Pause/Resume".to_string(), 15.0, 325.0),
+            TextOverlay::new("1-5: Speed (0.25x-4x)".to_string(), 15.0, 345.0),
+            TextOverlay::new("R: Reset simulation".to_string(), 15.0, 365.0),
+            TextOverlay::new("ESC: Exit".to_string(), 15.0, 385.0),
+        ];
         
-        // Also log debug info for development
+        // In a full implementation with actual text rendering:
+        // - These overlays would be rendered as text on top of the 3D scene
+        // - For now, we silently collect them and log debug info
+        
+        log::debug!("UI Overlays: {} text elements ready for rendering", overlays.len());
         log::debug!("Performance: FPS={:.1}, Frame={:.2}ms, Sim={:.2}ms", 
                    fps, performance.frame_time.as_millis(), performance.simulation_time.as_millis());
         

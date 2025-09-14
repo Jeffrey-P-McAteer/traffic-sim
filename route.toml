@@ -25,7 +25,7 @@ lane = 1             # which lane they enter into (1-based)
 merge_distance = 50.0 # meters to complete merge
 
 [[route.entries]]
-id = "entry_2" 
+id = "entry_2"
 type = "interior"
 angle = 180.0
 position = "inner"
@@ -43,7 +43,7 @@ exit_distance = 75.0  # meters of deceleration lane
 
 [[route.exits]]
 id = "exit_2"
-type = "exterior" 
+type = "exterior"
 angle = 270.0
 position = "outer"
 lane = 3

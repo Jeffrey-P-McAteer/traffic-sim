@@ -21,7 +21,9 @@ pub struct TrafficRenderer {
     // Vertex data
     car_vertex_buffer: wgpu::Buffer,
     road_vertex_buffer: wgpu::Buffer,
+    road_vertex_count: u32,
     car_instance_buffer: wgpu::Buffer,
+    road_identity_instance_buffer: wgpu::Buffer,
     
     // Shader layouts
     view_bind_group_layout: wgpu::BindGroupLayout,
@@ -309,6 +311,7 @@ impl TrafficRenderer {
         });
         
         let road_vertices = Self::create_road_vertices();
+        let road_vertex_count = road_vertices.len() as u32;
         let road_vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Road Vertex Buffer"),
             contents: bytemuck::cast_slice(&road_vertices),
@@ -323,6 +326,19 @@ impl TrafficRenderer {
             mapped_at_creation: false,
         });
         
+        // Create identity instance buffer for road rendering (since roads don't need per-instance transforms)
+        let identity_transform = Matrix4::identity();
+        let identity_instance = CarInstance {
+            transform: identity_transform.into(),
+            color: [1.0, 1.0, 1.0],
+            _padding: 0.0,
+        };
+        let road_identity_instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Road Identity Instance Buffer"),
+            contents: bytemuck::cast_slice(&[identity_instance]),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+        
         Ok(Self {
             surface,
             device,
@@ -334,7 +350,9 @@ impl TrafficRenderer {
             view_buffer,
             car_vertex_buffer,
             road_vertex_buffer,
+            road_vertex_count,
             car_instance_buffer,
+            road_identity_instance_buffer,
             view_bind_group_layout,
             max_cars: max_cars as u32,
         })
@@ -402,9 +420,10 @@ impl TrafficRenderer {
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.set_bind_group(0, &self.view_bind_group, &[]);
             
-            // Render road (using car vertices for now)
+            // Render road
             render_pass.set_vertex_buffer(0, self.road_vertex_buffer.slice(..));
-            // TODO: Add road instances
+            render_pass.set_vertex_buffer(1, self.road_identity_instance_buffer.slice(..));
+            render_pass.draw(0..self.road_vertex_count, 0..1);
             
             // Render cars
             if !state.cars.is_empty() {
@@ -434,12 +453,15 @@ impl TrafficRenderer {
     }
     
     fn create_road_vertices() -> Vec<Vertex> {
-        // Create a simple circle for the road
+        // Create donut-shaped highway with lane markings
         let mut vertices = Vec::new();
         let segments = 64;
         let inner_radius = 150.0;
         let outer_radius = 200.0;
+        let lane_width = 3.5;
+        let lane_count = 3;
         
+        // Create the road surface
         for i in 0..segments {
             let angle1 = (i as f32) * 2.0 * std::f32::consts::PI / (segments as f32);
             let angle2 = ((i + 1) as f32) * 2.0 * std::f32::consts::PI / (segments as f32);
@@ -452,16 +474,59 @@ impl TrafficRenderer {
             let outer1 = [outer_radius * angle1.cos(), outer_radius * angle1.sin(), 0.0];
             let outer2 = [outer_radius * angle2.cos(), outer_radius * angle2.sin(), 0.0];
             
-            let color = [0.3, 0.3, 0.3]; // Dark gray for road
+            let road_color = [0.2, 0.2, 0.2]; // Dark gray for asphalt
             
             // Create two triangles for each segment
-            vertices.push(Vertex { position: inner1, color });
-            vertices.push(Vertex { position: outer1, color });
-            vertices.push(Vertex { position: inner2, color });
+            vertices.push(Vertex { position: inner1, color: road_color });
+            vertices.push(Vertex { position: outer1, color: road_color });
+            vertices.push(Vertex { position: inner2, color: road_color });
             
-            vertices.push(Vertex { position: inner2, color });
-            vertices.push(Vertex { position: outer1, color });
-            vertices.push(Vertex { position: outer2, color });
+            vertices.push(Vertex { position: inner2, color: road_color });
+            vertices.push(Vertex { position: outer1, color: road_color });
+            vertices.push(Vertex { position: outer2, color: road_color });
+        }
+        
+        // Add lane markings (white dashed lines)
+        let line_width = 0.15;
+        let dash_length = 3.0; // meters
+        let dash_spacing = 6.0; // meters
+        let white_color = [0.9, 0.9, 0.9];
+        
+        for lane in 1..lane_count {
+            let lane_radius = inner_radius + lane_width * lane as f32;
+            let circumference = 2.0 * std::f32::consts::PI * lane_radius;
+            let dash_cycle = dash_length + dash_spacing;
+            let num_dashes = (circumference / dash_cycle) as usize;
+            
+            for dash in 0..num_dashes {
+                let start_angle = (dash as f32) * dash_cycle / lane_radius;
+                let end_angle = start_angle + (dash_length / lane_radius);
+                
+                let dash_segments = 8; // Segments per dash for smoothness
+                for seg in 0..dash_segments {
+                    let t1 = seg as f32 / dash_segments as f32;
+                    let t2 = (seg + 1) as f32 / dash_segments as f32;
+                    let a1 = start_angle + (end_angle - start_angle) * t1;
+                    let a2 = start_angle + (end_angle - start_angle) * t2;
+                    
+                    let inner_r = lane_radius - line_width * 0.5;
+                    let outer_r = lane_radius + line_width * 0.5;
+                    
+                    let p1 = [inner_r * a1.cos(), inner_r * a1.sin(), 0.01]; // Slightly above road
+                    let p2 = [outer_r * a1.cos(), outer_r * a1.sin(), 0.01];
+                    let p3 = [inner_r * a2.cos(), inner_r * a2.sin(), 0.01];
+                    let p4 = [outer_r * a2.cos(), outer_r * a2.sin(), 0.01];
+                    
+                    // Two triangles for the dash segment
+                    vertices.push(Vertex { position: p1, color: white_color });
+                    vertices.push(Vertex { position: p2, color: white_color });
+                    vertices.push(Vertex { position: p3, color: white_color });
+                    
+                    vertices.push(Vertex { position: p3, color: white_color });
+                    vertices.push(Vertex { position: p2, color: white_color });
+                    vertices.push(Vertex { position: p4, color: white_color });
+                }
+            }
         }
         
         vertices
