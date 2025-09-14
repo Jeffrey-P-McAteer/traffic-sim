@@ -106,7 +106,7 @@ impl Application {
         // Initialize graphics system
         let graphics = match event_loop {
             Some(event_loop) => {
-                let graphics = GraphicsSystem::new(event_loop).await?;
+                let graphics = GraphicsSystem::new(event_loop, config.route.route.geometry.geometry_type.clone()).await?;
                 info!("Graphics system initialized");
                 graphics
             }

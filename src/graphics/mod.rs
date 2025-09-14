@@ -25,7 +25,7 @@ pub struct GraphicsSystem {
 }
 
 impl GraphicsSystem {
-    pub async fn new(event_loop: &EventLoop<()>) -> Result<Self> {
+    pub async fn new(event_loop: &EventLoop<()>, geometry_type: String) -> Result<Self> {
         let window = std::sync::Arc::new(
             winit::window::WindowBuilder::new()
                 .with_title("Traffic Simulator")
@@ -33,7 +33,7 @@ impl GraphicsSystem {
                 .build(event_loop)?
         );
         
-        let renderer = TrafficRenderer::new(window.clone()).await?;
+        let renderer = TrafficRenderer::new(window.clone(), geometry_type).await?;
         let viewport = Viewport::new(1200.0, 800.0);
         let ui = UiRenderer::new()?;
         

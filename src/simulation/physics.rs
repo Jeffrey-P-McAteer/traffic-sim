@@ -179,8 +179,7 @@ impl PhysicsEngine {
     }
     
     fn calculate_cloverleaf_update(&self, car: &Car, state: &SimulationState, dt: f32) -> CarUpdate {
-        // For now, implement as a simple rectangular highway with straight-line motion
-        // This is a simplified implementation - in reality cloverleaf would have complex curved paths
+        // Proper cloverleaf implementation with highway paths and loop ramps
         
         // Find nearest cars for collision avoidance
         let (front_car, front_distance) = self.find_front_car_straight(car, state);
@@ -205,19 +204,8 @@ impl PhysicsEngine {
             }
         }
         
-        // Calculate heading based on current velocity or default to eastward
-        let heading = if car.velocity.magnitude() > 0.1 {
-            car.velocity.y.atan2(car.velocity.x)
-        } else {
-            0.0 // Default to eastward
-        };
-        
-        // For cloverleaf, maintain straight-line motion with simple forward velocity
-        let velocity_direction = Vector2::new(heading.cos(), heading.sin());
-        let new_velocity = velocity_direction * target_speed;
-        
-        // Update position with straight-line motion
-        let new_position = car.position + new_velocity * dt;
+        // Determine path type based on lane number
+        let (path_direction, new_position, new_velocity, heading) = self.calculate_cloverleaf_path(car, target_speed, dt);
         
         // Calculate acceleration vector
         let acceleration = if dt > 0.0 {
@@ -232,6 +220,73 @@ impl PhysicsEngine {
             acceleration,
             heading,
             lane_change_progress: car.lane_change_progress,
+        }
+    }
+    
+    fn calculate_cloverleaf_path(&self, car: &Car, target_speed: f32, dt: f32) -> (String, Point, Vector2<f32>, f32) {
+        // Lane assignments for cloverleaf:
+        // Lanes 1-3:  North-South Southbound (top to bottom)
+        // Lanes 4-6:  North-South Northbound (bottom to top)  
+        // Lanes 7-9:  East-West Westbound (right to left)
+        // Lanes 10-12: East-West Eastbound (left to right)
+        
+        let route_geom = &self.route.route.geometry;
+        let highway_half_width = route_geom.highway_width.unwrap_or(40.0) / 2.0;
+        
+        match car.current_lane {
+            // North-South Southbound (lanes 1-3)
+            1..=3 => {
+                let lane_offset = (car.current_lane - 2) as f32 * route_geom.lane_width; // -3.5, 0, 3.5
+                let x_pos = lane_offset;
+                let y_pos = car.position.y - target_speed * dt;
+                let heading = -std::f32::consts::PI / 2.0; // Pointing south
+                let velocity = Vector2::new(0.0, -target_speed);
+                
+                ("southbound".to_string(), Point2::new(x_pos, y_pos), velocity, heading)
+            }
+            // North-South Northbound (lanes 4-6)
+            4..=6 => {
+                let lane_offset = (5 - car.current_lane) as f32 * route_geom.lane_width; // 3.5, 0, -3.5
+                let x_pos = lane_offset;
+                let y_pos = car.position.y + target_speed * dt;
+                let heading = std::f32::consts::PI / 2.0; // Pointing north
+                let velocity = Vector2::new(0.0, target_speed);
+                
+                ("northbound".to_string(), Point2::new(x_pos, y_pos), velocity, heading)
+            }
+            // East-West Westbound (lanes 7-9)
+            7..=9 => {
+                let lane_offset = (8 - car.current_lane) as f32 * route_geom.lane_width; // 3.5, 0, -3.5
+                let y_pos = lane_offset;
+                let x_pos = car.position.x - target_speed * dt;
+                let heading = std::f32::consts::PI; // Pointing west
+                let velocity = Vector2::new(-target_speed, 0.0);
+                
+                ("westbound".to_string(), Point2::new(x_pos, y_pos), velocity, heading)
+            }
+            // East-West Eastbound (lanes 10-12)
+            10..=12 => {
+                let lane_offset = (car.current_lane - 11) as f32 * route_geom.lane_width; // -3.5, 0, 3.5
+                let y_pos = lane_offset;
+                let x_pos = car.position.x + target_speed * dt;
+                let heading = 0.0; // Pointing east
+                let velocity = Vector2::new(target_speed, 0.0);
+                
+                ("eastbound".to_string(), Point2::new(x_pos, y_pos), velocity, heading)
+            }
+            // Loop ramps or invalid lanes - maintain current direction
+            _ => {
+                let current_heading = if car.velocity.magnitude() > 0.1 {
+                    car.velocity.y.atan2(car.velocity.x)
+                } else {
+                    0.0
+                };
+                let velocity_direction = Vector2::new(current_heading.cos(), current_heading.sin());
+                let new_velocity = velocity_direction * target_speed;
+                let new_position = car.position + new_velocity * dt;
+                
+                ("loop".to_string(), new_position, new_velocity, current_heading)
+            }
         }
     }
     

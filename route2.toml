@@ -1,163 +1,354 @@
 # Traffic Simulation Route Configuration
-# Cloverleaf Interchange - Main highway with loop on/off ramps
+# Classic Cloverleaf Interchange - Two intersecting highways
 
 [route]
 name = "Cloverleaf Interchange"
-description = "Highway interchange with cloverleaf loop ramps for merging traffic"
+description = "Classic cloverleaf highway interchange with loop ramps for left turns"
 
-# Route geometry - primary highway with loop ramps
+# Route geometry - two intersecting highways (North-South and East-West)
 [route.geometry]
 type = "cloverleaf"
 center_x = 0.0
 center_y = 0.0
-# Main highway dimensions
-inner_radius = 100.0      # meters - required field for compatibility
-outer_radius = 200.0      # meters - outer boundary of the interchange
-highway_width = 100.0     # meters (width of main highway section)
-highway_length = 400.0    # meters (length of main highway section)
+# Highway dimensions
+inner_radius = 80.0       # meters - inner edge of highway corridors
+outer_radius = 120.0      # meters - outer edge of highway corridors
+highway_width = 40.0      # meters - width of each direction of highway
 lane_width = 3.5          # meters per lane
-lane_count = 4            # 4 lanes total (2 each direction)
+lane_count = 12           # Total lanes: 3×4 directions (NS-S, NS-N, EW-W, EW-E)
 
-# Loop ramp specifications
-loop_radius = 75.0        # meters radius for cloverleaf loops
-ramp_width = 20.0         # meters width of ramp roads
-ramp_lanes = 2            # lanes per ramp
+# Loop ramp specifications for left turns (270° clockwise loops)
+loop_radius = 60.0        # meters - radius of the quarter-circle loop ramps
+ramp_width = 7.0          # meters - width of each loop ramp
+ramp_lanes = 1            # single lane per loop ramp
 
-# Entry points (on-ramps from loop roads)
+# =============================================================================
+# HIGHWAY THROUGH-TRAFFIC ENTRY/EXIT POINTS
+# Cars traveling straight through the interchange
+# =============================================================================
+
+# North-South Highway - Southbound traffic (top to bottom)
 [[route.entries]]
-id = "northeast_onramp"
-type = "loop_ramp"
-angle = 45.0              # degrees - northeast quadrant
-position = "loop_merge"
-lane = 1                  # merge into right lane
-merge_distance = 80.0     # meters to complete merge
-loop_entry_angle = 135.0  # where cars enter the loop
-
-[[route.entries]]
-id = "southeast_onramp"
-type = "loop_ramp"
-angle = 135.0             # degrees - southeast quadrant  
-position = "loop_merge"
-lane = 1
-merge_distance = 80.0
-loop_entry_angle = 225.0
-
-[[route.entries]]
-id = "southwest_onramp"
-type = "loop_ramp"
-angle = 225.0             # degrees - southwest quadrant
-position = "loop_merge"
-lane = 3                  # merge into left-bound traffic
-merge_distance = 80.0
-loop_entry_angle = 315.0
-
-[[route.entries]]
-id = "northwest_onramp"
-type = "loop_ramp"
-angle = 315.0             # degrees - northwest quadrant
-position = "loop_merge"  
-lane = 3
-merge_distance = 80.0
-loop_entry_angle = 45.0
-
-# Exit points (off-ramps to loop roads)
-[[route.exits]]
-id = "northeast_offramp"
-type = "loop_ramp"
-angle = 30.0              # degrees - northeast exit
-position = "loop_exit"
-lane = 2                  # exit from inner lane
-exit_distance = 60.0      # meters of deceleration
-loop_exit_angle = 120.0
-
-[[route.exits]]
-id = "southeast_offramp" 
-type = "loop_ramp"
-angle = 120.0             # degrees - southeast exit
-position = "loop_exit"
-lane = 2
-exit_distance = 60.0
-loop_exit_angle = 210.0
-
-[[route.exits]]
-id = "southwest_offramp"
-type = "loop_ramp"
-angle = 210.0             # degrees - southwest exit  
-position = "loop_exit"
-lane = 4                  # exit from outer lane of opposite direction
-exit_distance = 60.0
-loop_exit_angle = 300.0
-
-[[route.exits]]
-id = "northwest_offramp"
-type = "loop_ramp"
-angle = 300.0             # degrees - northwest exit
-position = "loop_exit"
-lane = 4
-exit_distance = 60.0
-loop_exit_angle = 30.0
-
-# Through-traffic entries (main highway continuation)
-[[route.entries]]
-id = "east_mainline"
-type = "mainline"
-angle = 0.0               # entering from east
+id = "ns_south_entry"
+type = "through"
+angle = 270.0             # entering from north, heading south
 position = "highway_edge"
-lane = 2                  # middle travel lane
+lane = 1                  # rightmost lane (lane 1 of 3)
 merge_distance = 0.0      # no merge needed for through traffic
 
-[[route.entries]]  
-id = "west_mainline"
-type = "mainline"
-angle = 180.0             # entering from west
-position = "highway_edge"
-lane = 4                  # middle travel lane opposite direction
+[[route.entries]]
+id = "ns_south_entry_middle"
+type = "through"
+angle = 270.0
+position = "highway_edge" 
+lane = 2                  # middle lane
 merge_distance = 0.0
 
-# Through-traffic exits (main highway continuation)
+[[route.entries]]
+id = "ns_south_entry_left"
+type = "through"
+angle = 270.0
+position = "highway_edge"
+lane = 3                  # leftmost lane
+merge_distance = 0.0
+
+# North-South Highway - Northbound traffic (bottom to top)
+[[route.entries]]
+id = "ns_north_entry"
+type = "through"
+angle = 90.0              # entering from south, heading north  
+position = "highway_edge"
+lane = 4                  # rightmost northbound lane
+merge_distance = 0.0
+
+[[route.entries]]
+id = "ns_north_entry_middle"
+type = "through"
+angle = 90.0
+position = "highway_edge"
+lane = 5                  # middle northbound lane
+merge_distance = 0.0
+
+[[route.entries]]
+id = "ns_north_entry_left"
+type = "through"
+angle = 90.0
+position = "highway_edge"
+lane = 6                  # leftmost northbound lane
+merge_distance = 0.0
+
+# East-West Highway - Westbound traffic (right to left)
+[[route.entries]]
+id = "ew_west_entry"
+type = "through"
+angle = 180.0             # entering from east, heading west
+position = "highway_edge"
+lane = 7                  # rightmost westbound lane  
+merge_distance = 0.0
+
+[[route.entries]]
+id = "ew_west_entry_middle"
+type = "through" 
+angle = 180.0
+position = "highway_edge"
+lane = 8                  # middle westbound lane
+merge_distance = 0.0
+
+[[route.entries]]
+id = "ew_west_entry_left"
+type = "through"
+angle = 180.0
+position = "highway_edge"
+lane = 9                  # leftmost westbound lane
+merge_distance = 0.0
+
+# East-West Highway - Eastbound traffic (left to right)
+[[route.entries]]
+id = "ew_east_entry"
+type = "through"
+angle = 0.0               # entering from west, heading east
+position = "highway_edge"
+lane = 10                 # rightmost eastbound lane
+merge_distance = 0.0
+
+[[route.entries]]
+id = "ew_east_entry_middle"
+type = "through"
+angle = 0.0
+position = "highway_edge"
+lane = 11                 # middle eastbound lane 
+merge_distance = 0.0
+
+[[route.entries]]
+id = "ew_east_entry_left"
+type = "through"
+angle = 0.0
+position = "highway_edge"
+lane = 12                 # leftmost eastbound lane
+merge_distance = 0.0
+
+# =============================================================================
+# CLOVERLEAF LOOP RAMPS - LEFT TURN MOVEMENTS
+# Each loop allows traffic to turn left by making a 270° right turn
+# =============================================================================
+
+# Northeast Loop: For NS-Southbound traffic turning left to EW-Eastbound
+[[route.entries]]
+id = "ne_loop_entry"
+type = "loop_ramp"
+angle = 315.0             # entry point of loop (northwest of center)
+position = "loop_merge"
+lane = 12                 # merges into eastbound left lane
+merge_distance = 100.0    # meters to complete merge
+loop_entry_angle = 270.0  # where cars enter the loop from southbound
+
+# Southeast Loop: For EW-Eastbound traffic turning left to NS-Northbound  
+[[route.entries]]
+id = "se_loop_entry"
+type = "loop_ramp"
+angle = 45.0              # entry point of loop (northeast of center)
+position = "loop_merge"
+lane = 6                  # merges into northbound left lane
+merge_distance = 100.0
+loop_entry_angle = 0.0    # where cars enter the loop from eastbound
+
+# Southwest Loop: For NS-Northbound traffic turning left to EW-Westbound
+[[route.entries]]
+id = "sw_loop_entry"  
+type = "loop_ramp"
+angle = 135.0             # entry point of loop (southeast of center)
+position = "loop_merge"
+lane = 9                  # merges into westbound left lane
+merge_distance = 100.0
+loop_entry_angle = 90.0   # where cars enter the loop from northbound
+
+# Northwest Loop: For EW-Westbound traffic turning left to NS-Southbound
+[[route.entries]]
+id = "nw_loop_entry"
+type = "loop_ramp"
+angle = 225.0             # entry point of loop (southwest of center)
+position = "loop_merge"
+lane = 3                  # merges into southbound left lane
+merge_distance = 100.0
+loop_entry_angle = 180.0  # where cars enter the loop from westbound
+
+# =============================================================================
+# HIGHWAY THROUGH-TRAFFIC EXIT POINTS
+# Cars continuing straight through the interchange
+# =============================================================================
+
+# North-South Highway exits (southbound → north, northbound → south)
 [[route.exits]]
-id = "west_mainline_exit"
-type = "mainline" 
+id = "ns_south_exit"
+type = "through"
+angle = 270.0             # exiting to south
+position = "highway_edge"
+lane = 1                  # from rightmost southbound lane
+exit_distance = 0.0
+
+[[route.exits]]
+id = "ns_south_exit_middle"
+type = "through"
+angle = 270.0
+position = "highway_edge" 
+lane = 2                  # from middle southbound lane
+exit_distance = 0.0
+
+[[route.exits]]
+id = "ns_south_exit_left"
+type = "through"
+angle = 270.0
+position = "highway_edge"
+lane = 3                  # from leftmost southbound lane
+exit_distance = 0.0
+
+[[route.exits]]
+id = "ns_north_exit"
+type = "through"
+angle = 90.0              # exiting to north
+position = "highway_edge"
+lane = 4                  # from rightmost northbound lane
+exit_distance = 0.0
+
+[[route.exits]]
+id = "ns_north_exit_middle"
+type = "through"
+angle = 90.0
+position = "highway_edge"
+lane = 5                  # from middle northbound lane
+exit_distance = 0.0
+
+[[route.exits]]
+id = "ns_north_exit_left"
+type = "through"
+angle = 90.0
+position = "highway_edge"
+lane = 6                  # from leftmost northbound lane
+exit_distance = 0.0
+
+# East-West Highway exits (westbound → west, eastbound → east)
+[[route.exits]]
+id = "ew_west_exit"
+type = "through"
 angle = 180.0             # exiting to west
 position = "highway_edge"
-lane = 2                  # from eastbound lanes
+lane = 7                  # from rightmost westbound lane
 exit_distance = 0.0
 
 [[route.exits]]
-id = "east_mainline_exit"
-type = "mainline"
-angle = 0.0               # exiting to east  
+id = "ew_west_exit_middle"
+type = "through"
+angle = 180.0
 position = "highway_edge"
-lane = 4                  # from westbound lanes
+lane = 8                  # from middle westbound lane
 exit_distance = 0.0
 
-# Speed limits and traffic rules
+[[route.exits]]
+id = "ew_west_exit_left"
+type = "through"
+angle = 180.0
+position = "highway_edge"
+lane = 9                  # from leftmost westbound lane
+exit_distance = 0.0
+
+[[route.exits]]
+id = "ew_east_exit"
+type = "through"
+angle = 0.0               # exiting to east
+position = "highway_edge"
+lane = 10                 # from rightmost eastbound lane
+exit_distance = 0.0
+
+[[route.exits]]
+id = "ew_east_exit_middle"
+type = "through"
+angle = 0.0
+position = "highway_edge"
+lane = 11                 # from middle eastbound lane
+exit_distance = 0.0
+
+[[route.exits]]
+id = "ew_east_exit_left"
+type = "through"
+angle = 0.0
+position = "highway_edge"
+lane = 12                 # from leftmost eastbound lane
+exit_distance = 0.0
+
+# =============================================================================
+# CLOVERLEAF LOOP RAMP EXITS - LEFT TURN COMPLETIONS
+# Where cars exit the highway to begin their loop turn
+# =============================================================================
+
+# Northeast Loop Exit: NS-Southbound traffic exiting to turn left (to EW-East)
+[[route.exits]]
+id = "ne_loop_exit"
+type = "loop_ramp"
+angle = 315.0             # exit point from highway
+position = "loop_exit" 
+lane = 3                  # exit from southbound left lane
+exit_distance = 50.0      # meters of deceleration
+loop_exit_angle = 270.0   # direction leaving the highway
+
+# Southeast Loop Exit: EW-Eastbound traffic exiting to turn left (to NS-North)
+[[route.exits]]
+id = "se_loop_exit"
+type = "loop_ramp"
+angle = 45.0              # exit point from highway
+position = "loop_exit"
+lane = 12                 # exit from eastbound left lane  
+exit_distance = 50.0
+loop_exit_angle = 0.0     # direction leaving the highway
+
+# Southwest Loop Exit: NS-Northbound traffic exiting to turn left (to EW-West)
+[[route.exits]]
+id = "sw_loop_exit"
+type = "loop_ramp"
+angle = 135.0             # exit point from highway
+position = "loop_exit"
+lane = 6                  # exit from northbound left lane
+exit_distance = 50.0
+loop_exit_angle = 90.0    # direction leaving the highway
+
+# Northwest Loop Exit: EW-Westbound traffic exiting to turn left (to NS-South)
+[[route.exits]]
+id = "nw_loop_exit"  
+type = "loop_ramp"
+angle = 225.0             # exit point from highway
+position = "loop_exit"
+lane = 9                  # exit from westbound left lane
+exit_distance = 50.0
+loop_exit_angle = 180.0   # direction leaving the highway
+
+# =============================================================================
+# TRAFFIC RULES AND SPEED LIMITS
+# =============================================================================
+
 [route.traffic_rules]
-speed_limit = 30.6        # m/s (110 km/h, ~68 mph) - higher speed highway
-min_speed = 16.7          # m/s (60 km/h, ~37 mph)
-following_distance = 2.5  # seconds - longer following distance
-lane_change_time = 4.0    # seconds - more time needed for lane changes
+speed_limit = 30.6        # m/s (110 km/h, ~68 mph) - highway speed
+min_speed = 22.2          # m/s (80 km/h, ~50 mph)  
+following_distance = 1.5  # seconds - highway following distance
+lane_change_time = 3.0    # seconds - time for lane changes
 
-# Ramp-specific speed limits
-ramp_speed_limit = 22.2   # m/s (80 km/h, ~50 mph) - slower on ramps
-ramp_min_speed = 11.1     # m/s (40 km/h, ~25 mph)
+# Loop ramp speed limits (slower for tight curves)
+ramp_speed_limit = 16.7   # m/s (60 km/h, ~37 mph) - slower for loops
+ramp_min_speed = 8.3      # m/s (30 km/h, ~19 mph)
 
-# Traffic signals/control
+# Traffic signals (none - free flowing interchange)
 [route.signals]
-# Cloverleaf typically has no signals - free-flowing interchange
-has_signals = false
-ramp_metering = false     # no ramp meters for this design
+has_signals = false       # no traffic lights
+ramp_metering = false     # no ramp metering
 
-# Road surface properties  
+# Road surface properties
 [route.surface]
-friction_coefficient = 0.75  # good highway surface
-banking_angle = 3.0          # degrees - slightly more banking for higher speeds
-ramp_banking = 8.0           # degrees - more banking on loop ramps
+friction_coefficient = 0.8  # good highway surface
+banking_angle = 2.0         # degrees - slight banking on highways
+ramp_banking = 15.0         # degrees - more banking on loop ramps for safety
 
-# Interchange-specific properties
+# Interchange properties
 [route.interchange]
 type = "cloverleaf"
-design_speed = 80.0       # km/h design speed for ramps
-weaving_length = 200.0    # meters between merge/diverge points
-acceleration_lane = 120.0 # meters of acceleration lane
-deceleration_lane = 90.0  # meters of deceleration lane
+weaving_length = 300.0      # meters - distance between loop entry/exit
+acceleration_lane = 150.0   # meters - length of acceleration lanes
+deceleration_lane = 100.0   # meters - length of deceleration lanes
+loop_design_speed = 50.0    # km/h - design speed for loop ramps
