@@ -212,6 +212,9 @@ impl Application {
             
             self.compute_backend.update(&mut self.simulation_state)?;
             
+            // Update speed history for all cars
+            self.simulation_state.update_car_speeds();
+            
             // Update active car count and log changes
             self.simulation_state.active_cars = self.simulation_state.cars.len() as u32;
             

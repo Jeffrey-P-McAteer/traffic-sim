@@ -169,12 +169,13 @@ impl TrafficManager {
         
         // Calculate initial velocity (tangent to circle)
         let tangent_angle = angle_rad + std::f32::consts::PI / 2.0;
-        let initial_speed = car_type.preferred_speed * 0.5; // Start at half speed
+        let initial_speed = 26.8; // 60 mph in m/s (60 / 2.237 = 26.8)
         let velocity = Vector2::new(
             -tangent_angle.sin() * initial_speed,
             tangent_angle.cos() * initial_speed
         );
         
+        let initial_speed = initial_speed;
         let car = Car {
             id: CarId(self.next_car_id),
             position,
@@ -192,6 +193,7 @@ impl TrafficManager {
             behavior: behavior_state,
             behavior_type: behavior_name,
             car_type: car_type.id.clone(),
+            speed_history: [initial_speed, initial_speed, initial_speed],
         };
         
         state.add_car(car);
@@ -245,7 +247,7 @@ impl TrafficManager {
         
         // Calculate initial velocity (tangent to circle)
         let tangent_angle = angle_rad + std::f32::consts::PI / 2.0;
-        let initial_speed = car_type.preferred_speed * 0.5; // Start at half speed
+        let initial_speed = 26.8; // 60 mph in m/s (60 / 2.237 = 26.8)
         let velocity = Vector2::new(
             -tangent_angle.sin() * initial_speed,
             tangent_angle.cos() * initial_speed
@@ -268,6 +270,7 @@ impl TrafficManager {
             behavior: behavior_state,
             behavior_type: behavior_name.to_string(),
             car_type: car_type.id.clone(),
+            speed_history: [initial_speed, initial_speed, initial_speed],
         };
         
         state.add_car(car);

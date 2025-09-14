@@ -95,7 +95,7 @@ impl UiRenderer {
         
         // Controls help in the lower-left corner
         egui::Area::new(egui::Id::new("controls_overlay"))
-            .fixed_pos(egui::pos2(15.0, 350.0))
+            .fixed_pos(egui::pos2(15.0, 280.0))
             .show(ctx, |ui| {
                 ui.with_layout(egui::Layout::top_down(egui::Align::LEFT), |ui| {
                     // Semi-transparent background
@@ -129,11 +129,17 @@ impl UiRenderer {
                 });
             });
         
-        // Color legend in the lower-left corner
+        // Get behavior counts for the legend
+        let behavior_counts = state.get_behavior_counts();
+
+        // Color legend in the lower-left corner (20% wider)
         egui::Area::new(egui::Id::new("legend_overlay"))
             .anchor(egui::Align2::LEFT_BOTTOM, egui::vec2(15.0, -15.0))
             .show(ctx, |ui| {
                 ui.with_layout(egui::Layout::top_down(egui::Align::LEFT), |ui| {
+                    // Set minimum width to be 20% wider than default
+                    ui.set_min_width(240.0); // 20% wider than typical egui default (~200px)
+
                     // Semi-transparent background
                     let rect = ui.available_rect_before_wrap();
                     ui.painter().rect_filled(
@@ -146,11 +152,16 @@ impl UiRenderer {
                     ui.style_mut().override_text_style = Some(egui::TextStyle::Body);
                     
                     ui.colored_label(egui::Color32::WHITE, "=== CAR COLORS ===");
-                    ui.colored_label(egui::Color32::from_rgb(230, 50, 50), "● Aggressive (Red)");
-                    ui.colored_label(egui::Color32::from_rgb(50, 150, 230), "● Normal (Blue)");
-                    ui.colored_label(egui::Color32::from_rgb(50, 200, 50), "● Cautious (Green)");
-                    ui.colored_label(egui::Color32::from_rgb(230, 125, 25), "● Erratic (Orange)");
-                    ui.colored_label(egui::Color32::from_rgb(180, 50, 230), "● Strategic (Purple)");
+                    ui.colored_label(egui::Color32::from_rgb(230, 50, 50),
+                        format!("● Aggressive (Red): {}", behavior_counts.get("aggressive").unwrap_or(&0)));
+                    ui.colored_label(egui::Color32::from_rgb(50, 150, 230),
+                        format!("● Normal (Blue): {}", behavior_counts.get("normal").unwrap_or(&0)));
+                    ui.colored_label(egui::Color32::from_rgb(50, 200, 50),
+                        format!("● Cautious (Green): {}", behavior_counts.get("cautious").unwrap_or(&0)));
+                    ui.colored_label(egui::Color32::from_rgb(230, 125, 25),
+                        format!("● Erratic (Orange): {}", behavior_counts.get("erratic").unwrap_or(&0)));
+                    ui.colored_label(egui::Color32::from_rgb(180, 50, 230),
+                        format!("● Strategic (Purple): {}", behavior_counts.get("strategic").unwrap_or(&0)));
                     
                     ui.add_space(10.0);
                     
@@ -165,6 +176,137 @@ impl UiRenderer {
                     ui.colored_label(egui::Color32::WHITE, "Lane 1: Inner (Entry)");
                     ui.colored_label(egui::Color32::WHITE, "Lane 2: Middle (Travel)");
                     ui.colored_label(egui::Color32::WHITE, "Lane 3: Outer (Exit)");
+                });
+            });
+
+        // Velocity distribution graph on the right side
+        let velocity_distribution = state.get_velocity_distribution(16);
+        let max_count = velocity_distribution.iter().cloned().max().unwrap_or(0) as f32;
+
+        // Calculate max speed for bucket labels (convert m/s to mph: m/s * 2.237)
+        let max_speed_ms = state.cars.iter()
+            .map(|car| car.velocity.magnitude())
+            .fold(0.0, f32::max);
+        let max_speed_mph = max_speed_ms * 2.237;
+        let bucket_size_mph = if max_speed_mph > 0.0 { max_speed_mph / 16.0 } else { 0.0 };
+
+        egui::Area::new(egui::Id::new("velocity_graph"))
+            .anchor(egui::Align2::RIGHT_TOP, egui::vec2(-15.0, 15.0))
+            .show(ctx, |ui| {
+                ui.with_layout(egui::Layout::top_down(egui::Align::LEFT), |ui| {
+                    // Semi-transparent background
+                    let rect = egui::Rect::from_min_size(
+                        ui.cursor().min,
+                        egui::vec2(392.0, 300.0) // Another 40% wider: 280 * 1.4 = 392
+                    );
+                    ui.painter().rect_filled(
+                        rect.expand(5.0),
+                        5.0,
+                        egui::Color32::from_black_alpha(160)
+                    );
+
+                    ui.spacing_mut().item_spacing = egui::vec2(0.0, 2.0);
+                    ui.style_mut().override_text_style = Some(egui::TextStyle::Body);
+
+                    ui.colored_label(egui::Color32::WHITE, "=== VELOCITY DISTRIBUTION ===");
+                    ui.add_space(5.0);
+
+                    // Draw histogram
+                    let graph_rect = egui::Rect::from_min_size(
+                        ui.cursor().min + egui::vec2(10.0, 0.0),
+                        egui::vec2(372.0, 200.0) // Another 40% wider: 260 * 1.4 + 8 = 372
+                    );
+
+                    // Draw background for graph
+                    ui.painter().rect_filled(
+                        graph_rect,
+                        2.0,
+                        egui::Color32::from_gray(30)
+                    );
+
+                    // Draw bars
+                    let bar_width = graph_rect.width() / 16.0;
+                    for (i, &count) in velocity_distribution.iter().enumerate() {
+                        if count > 0 {
+                            let bar_height = if max_count > 0.0 {
+                                (count as f32 / max_count) * (graph_rect.height() - 20.0)
+                            } else {
+                                0.0
+                            };
+
+                            let bar_rect = egui::Rect::from_min_size(
+                                egui::pos2(
+                                    graph_rect.min.x + i as f32 * bar_width + 1.0,
+                                    graph_rect.max.y - bar_height - 10.0
+                                ),
+                                egui::vec2(bar_width - 2.0, bar_height)
+                            );
+
+                            // Color bars based on speed range
+                            let color = if i < 4 {
+                                egui::Color32::from_rgb(100, 255, 100) // Slow = green
+                            } else if i < 12 {
+                                egui::Color32::from_rgb(255, 255, 100) // Medium = yellow
+                            } else {
+                                egui::Color32::from_rgb(255, 100, 100) // Fast = red
+                            };
+
+                            ui.painter().rect_filled(bar_rect, 1.0, color);
+
+                            // Draw count label if there's room
+                            if bar_height > 15.0 {
+                                ui.painter().text(
+                                    bar_rect.center(),
+                                    egui::Align2::CENTER_CENTER,
+                                    count.to_string(),
+                                    egui::FontId::new(10.0, egui::FontFamily::Monospace),
+                                    egui::Color32::BLACK
+                                );
+                            }
+                        }
+                    }
+
+                    // Draw speed labels underneath each bucket (staggered)
+                    for i in 0..16 {
+                        let bucket_center_x = graph_rect.min.x + (i as f32 + 0.5) * bar_width;
+                        let speed_min_mph = i as f32 * bucket_size_mph;
+                        let speed_max_mph = (i + 1) as f32 * bucket_size_mph;
+
+                        // Draw middle value of the speed range
+                        let label = if bucket_size_mph > 0.0 {
+                            let middle_speed = (speed_min_mph + speed_max_mph) / 2.0;
+                            format!("{:.0}", middle_speed)
+                        } else {
+                            "0".to_string()
+                        };
+
+                        // Stagger labels: even indices on first line, odd indices on second line
+                        let y_offset = if i % 2 == 0 { 2.0 } else { 14.0 };
+
+                        ui.painter().text(
+                            egui::pos2(bucket_center_x, graph_rect.max.y + y_offset),
+                            egui::Align2::CENTER_TOP,
+                            label,
+                            egui::FontId::new(9.0, egui::FontFamily::Monospace),
+                            egui::Color32::WHITE
+                        );
+                    }
+
+                    // Draw axes labels (positioned below staggered speed labels)
+                    ui.painter().text(
+                        egui::pos2(graph_rect.min.x, graph_rect.max.y + 28.0),
+                        egui::Align2::LEFT_TOP,
+                        "Speed (mph)",
+                        egui::FontId::new(font_size * 0.8, egui::FontFamily::Monospace),
+                        egui::Color32::WHITE
+                    );
+
+                    // Move cursor past the graph (extra space for speed labels)
+                    ui.allocate_space(egui::vec2(392.0, 240.0));
+
+                    ui.add_space(5.0);
+                    ui.label(format!("Total cars: {}", state.active_cars));
+                    ui.label(format!("Max speed: {:.1} mph", max_speed_mph));
                 });
             });
     }

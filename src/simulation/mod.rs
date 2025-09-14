@@ -33,6 +33,21 @@ pub struct Car {
     pub behavior: BehaviorState,
     pub behavior_type: String,
     pub car_type: String,
+    pub speed_history: [f32; 3], // Last 3 speed measurements
+}
+
+impl Car {
+    pub fn update_speed_history(&mut self) {
+        let current_speed = self.velocity.magnitude();
+        // Shift history left and add new speed
+        self.speed_history[0] = self.speed_history[1];
+        self.speed_history[1] = self.speed_history[2];
+        self.speed_history[2] = current_speed;
+    }
+    
+    pub fn average_speed(&self) -> f32 {
+        self.speed_history.iter().sum::<f32>() / 3.0
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -85,6 +100,47 @@ impl SimulationState {
     
     pub fn get_car_mut(&mut self, id: CarId) -> Option<&mut Car> {
         self.cars.iter_mut().find(|c| c.id == id)
+    }
+    
+    pub fn update_car_speeds(&mut self) {
+        for car in &mut self.cars {
+            car.update_speed_history();
+        }
+    }
+    
+    pub fn get_behavior_counts(&self) -> std::collections::HashMap<String, usize> {
+        let mut counts = std::collections::HashMap::new();
+        for car in &self.cars {
+            *counts.entry(car.behavior_type.clone()).or_insert(0) += 1;
+        }
+        counts
+    }
+    
+    pub fn get_velocity_distribution(&self, num_buckets: usize) -> Vec<usize> {
+        let mut distribution = vec![0; num_buckets];
+        
+        if self.cars.is_empty() {
+            return distribution;
+        }
+        
+        // Find max speed to determine bucket range
+        let max_speed = self.cars.iter()
+            .map(|car| car.velocity.magnitude())
+            .fold(0.0, f32::max);
+        
+        if max_speed == 0.0 {
+            return distribution;
+        }
+        
+        let bucket_size = max_speed / num_buckets as f32;
+        
+        for car in &self.cars {
+            let speed = car.velocity.magnitude();
+            let bucket_index = ((speed / bucket_size) as usize).min(num_buckets - 1);
+            distribution[bucket_index] += 1;
+        }
+        
+        distribution
     }
 }
 
