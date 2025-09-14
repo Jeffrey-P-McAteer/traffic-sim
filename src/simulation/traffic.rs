@@ -80,7 +80,12 @@ impl TrafficManager {
             if *timer <= 0.0 {
                 // Try to spawn a car at this entry
                 if let Some(entry) = entries_to_check.iter().find(|e| &e.id == entry_id) {
-                    if Self::can_spawn_at_entry_static(entry, state, &self.route.route.geometry) {
+                    // Try regular spawning first, fallback to permissive spawning
+                    let can_spawn = Self::can_spawn_at_entry_static(entry, state, &self.route.route.geometry) ||
+                                   (state.active_cars < self.cars_config.simulation.total_cars / 2 && 
+                                    Self::can_spawn_at_entry_permissive(entry, state, &self.route.route.geometry));
+                    
+                    if can_spawn {
                         spawn_requests.push((entry_id.clone(), entry.clone()));
                         
                         // Reset timer with random interval
@@ -121,7 +126,7 @@ impl TrafficManager {
         );
         
         // Check if there's space at the entry point
-        let min_spawn_distance = 10.0; // Minimum distance from other cars (reduced from 20.0)
+        let min_spawn_distance = 5.0; // Minimum distance from other cars (further reduced to allow spawning in traffic)
         
         for car in &state.cars {
             let distance = (car.position - entry_pos).magnitude();
@@ -132,6 +137,37 @@ impl TrafficManager {
         }
         
         log::debug!("Can spawn at entry {} - no blocking cars", entry.id);
+        
+        true
+    }
+    
+    fn can_spawn_at_entry_permissive(
+        entry: &crate::config::EntryPoint, 
+        state: &SimulationState, 
+        route_geom: &crate::config::RouteGeometry
+    ) -> bool {
+        let center = Point2::new(route_geom.center_x, route_geom.center_y);
+        
+        // Calculate entry position
+        let angle_rad = entry.angle.to_radians();
+        let radius = Self::get_lane_radius_static(entry.lane, route_geom);
+        let entry_pos = center + Vector2::new(
+            radius * angle_rad.cos(),
+            radius * angle_rad.sin()
+        );
+        
+        // Very permissive distance check - only prevent spawning if cars are extremely close
+        let min_spawn_distance = 2.0; // Only 2 meters - allows spawning in tight traffic
+        
+        for car in &state.cars {
+            let distance = (car.position - entry_pos).magnitude();
+            if distance < min_spawn_distance {
+                log::debug!("Cannot spawn at entry {} - car extremely close ({:.1}m < {:.1}m)", entry.id, distance, min_spawn_distance);
+                return false;
+            }
+        }
+        
+        log::debug!("Can spawn at entry {} - permissive check passed", entry.id);
         
         true
     }
@@ -167,9 +203,30 @@ impl TrafficManager {
             radius * angle_rad.sin()
         );
         
-        // Calculate initial velocity (tangent to circle)
+        // Calculate initial velocity (tangent to circle) with adaptive speed
         let tangent_angle = angle_rad + std::f32::consts::PI / 2.0;
-        let initial_speed = 26.8; // 60 mph in m/s (60 / 2.237 = 26.8)
+        
+        // Adaptive speed based on nearby traffic conditions
+        let mut initial_speed = 26.8; // 60 mph in m/s (60 / 2.237 = 26.8) - default speed
+        
+        // Check nearby cars and adjust spawn speed to match traffic flow
+        let check_radius = 30.0; // meters
+        let mut nearby_speeds = Vec::new();
+        
+        for car in &state.cars {
+            let distance = (car.position - position).magnitude();
+            if distance < check_radius {
+                nearby_speeds.push(car.velocity.magnitude());
+            }
+        }
+        
+        if !nearby_speeds.is_empty() {
+            // Match average speed of nearby traffic, but ensure minimum reasonable speed
+            let avg_speed = nearby_speeds.iter().sum::<f32>() / nearby_speeds.len() as f32;
+            initial_speed = avg_speed.max(10.0).min(35.0); // Between 10-35 m/s (36-126 km/h)
+            log::debug!("Adaptive spawn speed: {:.1} m/s based on {} nearby cars", initial_speed, nearby_speeds.len());
+        }
+        
         let velocity = Vector2::new(
             -tangent_angle.sin() * initial_speed,
             tangent_angle.cos() * initial_speed
@@ -212,9 +269,9 @@ impl TrafficManager {
             return;
         };
         
-        // Check if we can spawn at this entry
-        if !Self::can_spawn_at_entry_static(&entry, state, &self.route.route.geometry) {
-            log::debug!("Cannot spawn manual car - entry blocked");
+        // For manual spawning, be more permissive - allow spawning with closer cars
+        if !Self::can_spawn_at_entry_permissive(&entry, state, &self.route.route.geometry) {
+            log::debug!("Cannot spawn manual car - entry severely congested");
             return;
         }
         
@@ -248,9 +305,30 @@ impl TrafficManager {
             radius * angle_rad.sin()
         );
         
-        // Calculate initial velocity (tangent to circle)
+        // Calculate initial velocity (tangent to circle) with adaptive speed for manual spawning
         let tangent_angle = angle_rad + std::f32::consts::PI / 2.0;
-        let initial_speed = 26.8; // 60 mph in m/s (60 / 2.237 = 26.8)
+        
+        // For manual spawning, be more conservative with speed matching to ensure safety
+        let mut initial_speed = 20.0; // Slightly slower default for manual spawning
+        
+        // Check nearby cars and adjust spawn speed to match traffic flow
+        let check_radius = 25.0; // meters - smaller radius for manual spawning
+        let mut nearby_speeds = Vec::new();
+        
+        for car in &state.cars {
+            let distance = (car.position - position).magnitude();
+            if distance < check_radius {
+                nearby_speeds.push(car.velocity.magnitude());
+            }
+        }
+        
+        if !nearby_speeds.is_empty() {
+            // For manual spawning, be more conservative - use min of nearby speeds
+            let min_speed = nearby_speeds.iter().copied().fold(f32::INFINITY, f32::min);
+            initial_speed = min_speed.max(5.0).min(30.0); // Between 5-30 m/s to avoid collisions
+            log::debug!("Manual spawn speed: {:.1} m/s based on {} nearby cars (conservative)", initial_speed, nearby_speeds.len());
+        }
+        
         let velocity = Vector2::new(
             -tangent_angle.sin() * initial_speed,
             tangent_angle.cos() * initial_speed

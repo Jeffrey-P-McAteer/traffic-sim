@@ -30,6 +30,17 @@ pub struct RouteGeometry {
     pub outer_radius: f32,
     pub lane_width: f32,
     pub lane_count: u32,
+    // Cloverleaf-specific fields
+    #[serde(default)]
+    pub highway_width: Option<f32>,
+    #[serde(default)]
+    pub highway_length: Option<f32>,
+    #[serde(default)]
+    pub loop_radius: Option<f32>,
+    #[serde(default)]
+    pub ramp_width: Option<f32>,
+    #[serde(default)]
+    pub ramp_lanes: Option<u32>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -41,6 +52,9 @@ pub struct EntryPoint {
     pub position: String,
     pub lane: u32,
     pub merge_distance: f32,
+    // Cloverleaf-specific fields
+    #[serde(default)]
+    pub loop_entry_angle: Option<f32>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -52,6 +66,9 @@ pub struct ExitPoint {
     pub position: String,
     pub lane: u32,
     pub exit_distance: f32,
+    // Cloverleaf-specific fields
+    #[serde(default)]
+    pub loop_exit_angle: Option<f32>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -75,8 +92,8 @@ impl Validate for RouteConfig {
     fn validate(&self) -> Result<()> {
         let geometry = &self.route.geometry;
         
-        if geometry.geometry_type != "donut" {
-            return Err(anyhow!("Only 'donut' geometry type is currently supported"));
+        if geometry.geometry_type != "donut" && geometry.geometry_type != "cloverleaf" {
+            return Err(anyhow!("Only 'donut' and 'cloverleaf' geometry types are currently supported"));
         }
         
         if geometry.inner_radius >= geometry.outer_radius {

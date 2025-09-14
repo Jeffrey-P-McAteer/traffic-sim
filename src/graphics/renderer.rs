@@ -543,6 +543,16 @@ impl TrafficRenderer {
     }
     
     fn create_road_vertices() -> Vec<Vertex> {
+        // Check if we should render cloverleaf or donut - for now we'll detect based on environment variable
+        // TODO: Pass route config to renderer to make this decision properly  
+        if std::env::var("ROUTE_TYPE").unwrap_or_default() == "cloverleaf" {
+            Self::create_cloverleaf_road_vertices()
+        } else {
+            Self::create_donut_road_vertices()
+        }
+    }
+    
+    fn create_donut_road_vertices() -> Vec<Vertex> {
         // Create donut-shaped highway with lane markings, entry/exit symbols
         let mut vertices = Vec::new();
         let segments = 64;
@@ -698,6 +708,134 @@ impl TrafficRenderer {
         }
         
         vertices
+    }
+    
+    fn create_cloverleaf_road_vertices() -> Vec<Vertex> {
+        // Create cloverleaf interchange with main highway and loop ramps
+        let mut vertices = Vec::new();
+        let highway_width = 100.0;
+        let highway_length = 400.0;
+        let loop_radius = 75.0;
+        let lane_width = 3.5;
+        
+        // Main horizontal highway (east-west)
+        let hw_color = [0.2, 0.2, 0.2]; // Dark gray for highway
+        let half_width = highway_width / 2.0;
+        let half_length = highway_length / 2.0;
+        
+        // Highway surface - main horizontal strip
+        vertices.extend_from_slice(&[
+            // First triangle
+            Vertex { position: [-half_length, -half_width, 0.0], color: hw_color },
+            Vertex { position: [half_length, -half_width, 0.0], color: hw_color },
+            Vertex { position: [-half_length, half_width, 0.0], color: hw_color },
+            
+            // Second triangle
+            Vertex { position: [-half_length, half_width, 0.0], color: hw_color },
+            Vertex { position: [half_length, -half_width, 0.0], color: hw_color },
+            Vertex { position: [half_length, half_width, 0.0], color: hw_color },
+        ]);
+        
+        // Main vertical highway (north-south)
+        vertices.extend_from_slice(&[
+            // First triangle
+            Vertex { position: [-half_width, -half_length, 0.0], color: hw_color },
+            Vertex { position: [half_width, -half_length, 0.0], color: hw_color },
+            Vertex { position: [-half_width, half_length, 0.0], color: hw_color },
+            
+            // Second triangle  
+            Vertex { position: [-half_width, half_length, 0.0], color: hw_color },
+            Vertex { position: [half_width, -half_length, 0.0], color: hw_color },
+            Vertex { position: [half_width, half_length, 0.0], color: hw_color },
+        ]);
+        
+        // Add four cloverleaf loops (one in each quadrant)
+        let loop_color = [0.25, 0.25, 0.25]; // Slightly lighter for ramps
+        let loop_centers = [
+            (half_width + loop_radius, half_width + loop_radius),   // NE quadrant
+            (half_width + loop_radius, -(half_width + loop_radius)), // SE quadrant  
+            (-(half_width + loop_radius), -(half_width + loop_radius)), // SW quadrant
+            (-(half_width + loop_radius), half_width + loop_radius),  // NW quadrant
+        ];
+        
+        for (center_x, center_y) in loop_centers {
+            Self::add_loop_ramp(&mut vertices, center_x, center_y, loop_radius, loop_color);
+        }
+        
+        // Add lane markings for the main highways  
+        let line_color = [0.8, 0.8, 0.8]; // White lane lines
+        let line_width = 0.3;
+        
+        // Horizontal highway lane lines
+        for lane in 1..4 { // 3 lanes each direction = 6 total, so 3 divider lines
+            let y_pos = (lane as f32 - 2.0) * lane_width; // -lane_width, 0, lane_width
+            Self::add_horizontal_line(&mut vertices, -half_length, half_length, y_pos, line_width, line_color);
+        }
+        
+        // Vertical highway lane lines  
+        for lane in 1..4 {
+            let x_pos = (lane as f32 - 2.0) * lane_width;
+            Self::add_vertical_line(&mut vertices, -half_length, half_length, x_pos, line_width, line_color);
+        }
+        
+        vertices
+    }
+    
+    fn add_loop_ramp(vertices: &mut Vec<Vertex>, center_x: f32, center_y: f32, radius: f32, color: [f32; 3]) {
+        let segments = 32;
+        let ramp_width = 10.0; // Width of the loop ramp
+        
+        for i in 0..segments {
+            let angle1 = (i as f32) * 2.0 * std::f32::consts::PI / (segments as f32);
+            let angle2 = ((i + 1) as f32) * 2.0 * std::f32::consts::PI / (segments as f32);
+            
+            // Inner circle
+            let inner_radius = radius - ramp_width / 2.0;
+            let inner1 = [center_x + inner_radius * angle1.cos(), center_y + inner_radius * angle1.sin(), 0.0];
+            let inner2 = [center_x + inner_radius * angle2.cos(), center_y + inner_radius * angle2.sin(), 0.0];
+            
+            // Outer circle  
+            let outer_radius = radius + ramp_width / 2.0;
+            let outer1 = [center_x + outer_radius * angle1.cos(), center_y + outer_radius * angle1.sin(), 0.0];
+            let outer2 = [center_x + outer_radius * angle2.cos(), center_y + outer_radius * angle2.sin(), 0.0];
+            
+            // Create two triangles for this segment
+            vertices.extend_from_slice(&[
+                Vertex { position: inner1, color },
+                Vertex { position: outer1, color },
+                Vertex { position: inner2, color },
+                
+                Vertex { position: inner2, color },
+                Vertex { position: outer1, color },
+                Vertex { position: outer2, color },
+            ]);
+        }
+    }
+    
+    fn add_horizontal_line(vertices: &mut Vec<Vertex>, x1: f32, x2: f32, y: f32, width: f32, color: [f32; 3]) {
+        let half_width = width / 2.0;
+        vertices.extend_from_slice(&[
+            Vertex { position: [x1, y - half_width, 0.01], color },
+            Vertex { position: [x2, y - half_width, 0.01], color },
+            Vertex { position: [x1, y + half_width, 0.01], color },
+            
+            Vertex { position: [x1, y + half_width, 0.01], color },
+            Vertex { position: [x2, y - half_width, 0.01], color },
+            Vertex { position: [x2, y + half_width, 0.01], color },
+        ]);
+    }
+    
+    fn add_vertical_line(vertices: &mut Vec<Vertex>, y1: f32, y2: f32, x: f32, width: f32, color: [f32; 3]) {
+        let half_width = width / 2.0;
+        vertices.extend_from_slice(&[
+            Vertex { position: [x - half_width, y1, 0.01], color },
+            Vertex { position: [x + half_width, y1, 0.01], color },
+            Vertex { position: [x - half_width, y2, 0.01], color },
+            
+            Vertex { position: [x - half_width, y2, 0.01], color },
+            Vertex { position: [x + half_width, y1, 0.01], color },
+            Vertex { position: [x + half_width, y2, 0.01], color },
+        ]);
     }
     
     fn add_circular_line(vertices: &mut Vec<Vertex>, radius: f32, width: f32, color: [f32; 3], z: f32, segments: usize) {

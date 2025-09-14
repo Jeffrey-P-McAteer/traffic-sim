@@ -374,6 +374,12 @@ impl SimulationBackend for GpuBackend {
     }
 }
 
+impl GpuBackend {
+    pub fn spawn_manual_car(&mut self, behavior_name: &str, state: &mut SimulationState) {
+        self.traffic_manager.spawn_manual_car(behavior_name, state);
+    }
+}
+
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Default)]
 struct RouteParams {

@@ -58,6 +58,19 @@ impl PhysicsEngine {
     fn calculate_car_update(&self, car: &Car, state: &SimulationState, dt: f32) -> CarUpdate {
         let route_geom = &self.route.route.geometry;
         
+        match route_geom.geometry_type.as_str() {
+            "donut" => self.calculate_donut_update(car, state, dt),
+            "cloverleaf" => self.calculate_cloverleaf_update(car, state, dt),
+            _ => {
+                // Default to donut behavior
+                self.calculate_donut_update(car, state, dt)
+            }
+        }
+    }
+    
+    fn calculate_donut_update(&self, car: &Car, state: &SimulationState, dt: f32) -> CarUpdate {
+        let route_geom = &self.route.route.geometry;
+        
         // Get current position on donut
         let center = Point2::new(route_geom.center_x, route_geom.center_y);
         let to_car = car.position - center;
@@ -162,6 +175,101 @@ impl PhysicsEngine {
             acceleration,
             heading,
             lane_change_progress,
+        }
+    }
+    
+    fn calculate_cloverleaf_update(&self, car: &Car, state: &SimulationState, dt: f32) -> CarUpdate {
+        // For now, implement as a simple rectangular highway with straight-line motion
+        // This is a simplified implementation - in reality cloverleaf would have complex curved paths
+        
+        // Find nearest cars for collision avoidance
+        let (front_car, front_distance) = self.find_front_car_straight(car, state);
+        let following_distance = self.calculate_following_distance(car);
+        
+        // Calculate desired speed based on traffic and behavior
+        let mut target_speed = car.behavior.target_speed;
+        
+        // Collision avoidance
+        if let Some(distance) = front_distance {
+            if distance < self.collision_avoidance.emergency_brake_distance {
+                target_speed = 0.0; // Emergency brake
+            } else if distance < self.collision_avoidance.warning_distance {
+                let brake_factor = (distance - self.collision_avoidance.emergency_brake_distance) 
+                    / (self.collision_avoidance.warning_distance - self.collision_avoidance.emergency_brake_distance);
+                target_speed *= brake_factor;
+            } else if distance < following_distance {
+                // Maintain following distance
+                if let Some(front_car) = front_car {
+                    target_speed = front_car.velocity.magnitude().min(target_speed);
+                }
+            }
+        }
+        
+        // Calculate heading based on current velocity or default to eastward
+        let heading = if car.velocity.magnitude() > 0.1 {
+            car.velocity.y.atan2(car.velocity.x)
+        } else {
+            0.0 // Default to eastward
+        };
+        
+        // For cloverleaf, maintain straight-line motion with simple forward velocity
+        let velocity_direction = Vector2::new(heading.cos(), heading.sin());
+        let new_velocity = velocity_direction * target_speed;
+        
+        // Update position with straight-line motion
+        let new_position = car.position + new_velocity * dt;
+        
+        // Calculate acceleration vector
+        let acceleration = if dt > 0.0 {
+            (new_velocity - car.velocity) / dt
+        } else {
+            Vector2::zeros()
+        };
+        
+        CarUpdate {
+            position: new_position,
+            velocity: new_velocity,
+            acceleration,
+            heading,
+            lane_change_progress: car.lane_change_progress,
+        }
+    }
+    
+    fn find_front_car_straight<'a>(&self, car: &Car, state: &'a SimulationState) -> (Option<&'a Car>, Option<f32>) {
+        // Simplified straight-line front car detection for cloverleaf
+        let car_direction = if car.velocity.magnitude() > 0.1 {
+            car.velocity.normalize()
+        } else {
+            Vector2::new(1.0, 0.0) // Default to eastward
+        };
+        
+        let mut closest_car: Option<&Car> = None;
+        let mut closest_distance = f32::INFINITY;
+        
+        for other_car in &state.cars {
+            if other_car.id == car.id {
+                continue;
+            }
+            
+            // Only consider cars in same lane
+            if other_car.current_lane != car.current_lane {
+                continue;
+            }
+            
+            let to_other = other_car.position - car.position;
+            let distance = to_other.magnitude();
+            
+            // Check if other car is in front (dot product > 0)
+            if to_other.dot(&car_direction) > 0.0 && distance < closest_distance {
+                closest_distance = distance;
+                closest_car = Some(other_car);
+            }
+        }
+        
+        if closest_distance == f32::INFINITY {
+            (None, None)
+        } else {
+            (closest_car, Some(closest_distance))
         }
     }
     
