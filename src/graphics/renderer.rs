@@ -527,20 +527,18 @@ impl TrafficRenderer {
     }
     
     fn create_car_vertices() -> Vec<Vertex> {
-        // Car is at least 2x longer than it is wide, like a real car
-        // Short edge (width) faces forward in direction of travel (Y axis)  
-        // Long edge (length) runs perpendicular to travel direction (X axis)
-        // Width = 0.5 (Y axis, from -0.25 to +0.25), Length = 1.0 (X axis, from -0.5 to +0.5)
+        // Cars are perfect squares with 1:1 aspect ratio
+        // Width = Height = 1.0 unit (from -0.5 to +0.5 on both axes)
         vec![
-            // Rectangle as two triangles - short edge forward along Y axis
+            // Square as two triangles
             // Triangle 1 (top-left, bottom-left, top-right)
-            Vertex { position: [-0.5, 0.25, 0.0], color: [1.0, 1.0, 1.0] },   // Top-left (long side)
-            Vertex { position: [-0.5, -0.25, 0.0], color: [1.0, 1.0, 1.0] },  // Bottom-left  
-            Vertex { position: [0.5, 0.25, 0.0], color: [1.0, 1.0, 1.0] },    // Top-right
+            Vertex { position: [-0.5, 0.5, 0.0], color: [1.0, 1.0, 1.0] },   // Top-left
+            Vertex { position: [-0.5, -0.5, 0.0], color: [1.0, 1.0, 1.0] },  // Bottom-left  
+            Vertex { position: [0.5, 0.5, 0.0], color: [1.0, 1.0, 1.0] },    // Top-right
             // Triangle 2 (bottom-left, bottom-right, top-right)
-            Vertex { position: [-0.5, -0.25, 0.0], color: [1.0, 1.0, 1.0] },  // Bottom-left
-            Vertex { position: [0.5, -0.25, 0.0], color: [1.0, 1.0, 1.0] },   // Bottom-right
-            Vertex { position: [0.5, 0.25, 0.0], color: [1.0, 1.0, 1.0] },    // Top-right
+            Vertex { position: [-0.5, -0.5, 0.0], color: [1.0, 1.0, 1.0] },  // Bottom-left
+            Vertex { position: [0.5, -0.5, 0.0], color: [1.0, 1.0, 1.0] },   // Bottom-right
+            Vertex { position: [0.5, 0.5, 0.0], color: [1.0, 1.0, 1.0] },    // Top-right
         ]
     }
     
@@ -781,8 +779,9 @@ impl TrafficRenderer {
     }
     
     fn create_car_instance(&self, car: &Car) -> CarInstance {
-        // Create transformation matrix
-        let scale = Matrix4::new_nonuniform_scaling(&nalgebra::Vector3::new(car.length, car.width, 1.0));
+        // Create transformation matrix with uniform scaling for 1:1 square cars
+        let car_size = 3.0; // Fixed size for all cars to ensure consistent 1:1 squares
+        let scale = Matrix4::new_nonuniform_scaling(&nalgebra::Vector3::new(car_size, car_size, 1.0));
         let rotation = Matrix4::from_euler_angles(0.0, 0.0, car.heading);
         let translation = Matrix4::new_translation(&nalgebra::Vector3::new(car.position.x, car.position.y, 0.0));
         

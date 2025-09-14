@@ -1,0 +1,161 @@
+# Traffic Simulation Route Configuration
+# Cloverleaf Interchange - Main highway with loop on/off ramps
+
+[route]
+name = "Cloverleaf Interchange"
+description = "Highway interchange with cloverleaf loop ramps for merging traffic"
+
+# Route geometry - primary highway with loop ramps
+[route.geometry]
+type = "cloverleaf"
+center_x = 0.0
+center_y = 0.0
+# Main highway dimensions
+highway_width = 100.0     # meters (width of main highway section)
+highway_length = 400.0    # meters (length of main highway section)
+lane_width = 3.5          # meters per lane
+lane_count = 4            # 4 lanes total (2 each direction)
+
+# Loop ramp specifications
+loop_radius = 75.0        # meters radius for cloverleaf loops
+ramp_width = 20.0         # meters width of ramp roads
+ramp_lanes = 2            # lanes per ramp
+
+# Entry points (on-ramps from loop roads)
+[[route.entries]]
+id = "northeast_onramp"
+type = "loop_ramp"
+angle = 45.0              # degrees - northeast quadrant
+position = "loop_merge"
+lane = 1                  # merge into right lane
+merge_distance = 80.0     # meters to complete merge
+loop_entry_angle = 135.0  # where cars enter the loop
+
+[[route.entries]]
+id = "southeast_onramp"
+type = "loop_ramp"
+angle = 135.0             # degrees - southeast quadrant  
+position = "loop_merge"
+lane = 1
+merge_distance = 80.0
+loop_entry_angle = 225.0
+
+[[route.entries]]
+id = "southwest_onramp"
+type = "loop_ramp"
+angle = 225.0             # degrees - southwest quadrant
+position = "loop_merge"
+lane = 3                  # merge into left-bound traffic
+merge_distance = 80.0
+loop_entry_angle = 315.0
+
+[[route.entries]]
+id = "northwest_onramp"
+type = "loop_ramp"
+angle = 315.0             # degrees - northwest quadrant
+position = "loop_merge"  
+lane = 3
+merge_distance = 80.0
+loop_entry_angle = 45.0
+
+# Exit points (off-ramps to loop roads)
+[[route.exits]]
+id = "northeast_offramp"
+type = "loop_ramp"
+angle = 30.0              # degrees - northeast exit
+position = "loop_exit"
+lane = 2                  # exit from inner lane
+exit_distance = 60.0      # meters of deceleration
+loop_exit_angle = 120.0
+
+[[route.exits]]
+id = "southeast_offramp" 
+type = "loop_ramp"
+angle = 120.0             # degrees - southeast exit
+position = "loop_exit"
+lane = 2
+exit_distance = 60.0
+loop_exit_angle = 210.0
+
+[[route.exits]]
+id = "southwest_offramp"
+type = "loop_ramp"
+angle = 210.0             # degrees - southwest exit  
+position = "loop_exit"
+lane = 4                  # exit from outer lane of opposite direction
+exit_distance = 60.0
+loop_exit_angle = 300.0
+
+[[route.exits]]
+id = "northwest_offramp"
+type = "loop_ramp"
+angle = 300.0             # degrees - northwest exit
+position = "loop_exit"
+lane = 4
+exit_distance = 60.0
+loop_exit_angle = 30.0
+
+# Through-traffic entries (main highway continuation)
+[[route.entries]]
+id = "east_mainline"
+type = "mainline"
+angle = 0.0               # entering from east
+position = "highway_edge"
+lane = 2                  # middle travel lane
+merge_distance = 0.0      # no merge needed for through traffic
+
+[[route.entries]]  
+id = "west_mainline"
+type = "mainline"
+angle = 180.0             # entering from west
+position = "highway_edge"
+lane = 4                  # middle travel lane opposite direction
+merge_distance = 0.0
+
+# Through-traffic exits (main highway continuation)
+[[route.exits]]
+id = "west_mainline_exit"
+type = "mainline" 
+angle = 180.0             # exiting to west
+position = "highway_edge"
+lane = 2                  # from eastbound lanes
+exit_distance = 0.0
+
+[[route.exits]]
+id = "east_mainline_exit"
+type = "mainline"
+angle = 0.0               # exiting to east  
+position = "highway_edge"
+lane = 4                  # from westbound lanes
+exit_distance = 0.0
+
+# Speed limits and traffic rules
+[route.traffic_rules]
+speed_limit = 30.6        # m/s (110 km/h, ~68 mph) - higher speed highway
+min_speed = 16.7          # m/s (60 km/h, ~37 mph)
+following_distance = 2.5  # seconds - longer following distance
+lane_change_time = 4.0    # seconds - more time needed for lane changes
+
+# Ramp-specific speed limits
+ramp_speed_limit = 22.2   # m/s (80 km/h, ~50 mph) - slower on ramps
+ramp_min_speed = 11.1     # m/s (40 km/h, ~25 mph)
+
+# Traffic signals/control
+[route.signals]
+# Cloverleaf typically has no signals - free-flowing interchange
+has_signals = false
+ramp_metering = false     # no ramp meters for this design
+
+# Road surface properties  
+[route.surface]
+friction_coefficient = 0.75  # good highway surface
+banking_angle = 3.0          # degrees - slightly more banking for higher speeds
+ramp_banking = 8.0           # degrees - more banking on loop ramps
+
+# Interchange-specific properties
+[route.interchange]
+type = "cloverleaf"
+design_speed = 80.0       # km/h design speed for ramps
+weaving_length = 200.0    # meters between merge/diverge points
+acceleration_lane = 120.0 # meters of acceleration lane
+deceleration_lane = 90.0  # meters of deceleration lane
