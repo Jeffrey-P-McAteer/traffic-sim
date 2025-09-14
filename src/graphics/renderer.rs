@@ -680,7 +680,7 @@ impl TrafficRenderer {
         let entry_color = [0.0, 0.8, 0.0]; // Bright green
         
         for &entry_angle in &entry_positions {
-            Self::add_entry_symbol(&mut vertices, entry_angle, inner_radius - 5.0, entry_color);
+            Self::add_entry_symbol(&mut vertices, entry_angle, inner_radius - 8.0, entry_color);
         }
         
         // Add exit points (red arrows/triangles at exterior positions)  
@@ -688,7 +688,7 @@ impl TrafficRenderer {
         let exit_color = [0.8, 0.0, 0.0]; // Bright red
         
         for &exit_angle in &exit_positions {
-            Self::add_exit_symbol(&mut vertices, exit_angle, outer_radius + 5.0, exit_color);
+            Self::add_exit_symbol(&mut vertices, exit_angle, outer_radius + 8.0, exit_color);
         }
         
         vertices
@@ -723,26 +723,26 @@ impl TrafficRenderer {
         let center_x = radius * angle_rad.cos();
         let center_y = radius * angle_rad.sin();
         
-        // Create arrow pointing inward (toward the highway)
-        let size = 4.0;
+        // Create much larger, simpler triangle pointing inward
+        let size = 15.0; // Much larger
         let arrow_angle = angle_rad + std::f32::consts::PI; // Point inward
         
         // Arrow tip
         let tip_x = center_x + size * arrow_angle.cos();
         let tip_y = center_y + size * arrow_angle.sin();
         
-        // Arrow base points
-        let base_angle1 = arrow_angle + 2.5;
-        let base_angle2 = arrow_angle - 2.5;
-        let base_x1 = center_x + (size * 0.6) * base_angle1.cos();
-        let base_y1 = center_y + (size * 0.6) * base_angle1.sin();
-        let base_x2 = center_x + (size * 0.6) * base_angle2.cos();
-        let base_y2 = center_y + (size * 0.6) * base_angle2.sin();
+        // Arrow base points - spread them wider
+        let base_angle1 = arrow_angle + 0.8; // Narrower angle
+        let base_angle2 = arrow_angle - 0.8;
+        let base_x1 = center_x + (size * 0.4) * base_angle1.cos();
+        let base_y1 = center_y + (size * 0.4) * base_angle1.sin();
+        let base_x2 = center_x + (size * 0.4) * base_angle2.cos();
+        let base_y2 = center_y + (size * 0.4) * base_angle2.sin();
         
-        // Create triangle for arrow
-        vertices.push(Vertex { position: [tip_x, tip_y, 0.02], color });
-        vertices.push(Vertex { position: [base_x1, base_y1, 0.02], color });
-        vertices.push(Vertex { position: [base_x2, base_y2, 0.02], color });
+        // Create triangle for arrow - positioned higher above road
+        vertices.push(Vertex { position: [tip_x, tip_y, 0.1], color });
+        vertices.push(Vertex { position: [base_x1, base_y1, 0.1], color });
+        vertices.push(Vertex { position: [base_x2, base_y2, 0.1], color });
     }
     
     fn add_exit_symbol(vertices: &mut Vec<Vertex>, angle_deg: f32, radius: f32, color: [f32; 3]) {
@@ -750,26 +750,26 @@ impl TrafficRenderer {
         let center_x = radius * angle_rad.cos();
         let center_y = radius * angle_rad.sin();
         
-        // Create arrow pointing outward (away from the highway)
-        let size = 4.0;
+        // Create much larger arrow pointing outward (away from the highway)
+        let size = 15.0; // Much larger
         let arrow_angle = angle_rad; // Point outward
         
         // Arrow tip
         let tip_x = center_x + size * arrow_angle.cos();
         let tip_y = center_y + size * arrow_angle.sin();
         
-        // Arrow base points
-        let base_angle1 = arrow_angle + 2.5;
-        let base_angle2 = arrow_angle - 2.5;
-        let base_x1 = center_x + (size * 0.6) * base_angle1.cos();
-        let base_y1 = center_y + (size * 0.6) * base_angle1.sin();
-        let base_x2 = center_x + (size * 0.6) * base_angle2.cos();
-        let base_y2 = center_y + (size * 0.6) * base_angle2.sin();
+        // Arrow base points - spread them wider
+        let base_angle1 = arrow_angle + 0.8; // Narrower angle
+        let base_angle2 = arrow_angle - 0.8;
+        let base_x1 = center_x + (size * 0.4) * base_angle1.cos();
+        let base_y1 = center_y + (size * 0.4) * base_angle1.sin();
+        let base_x2 = center_x + (size * 0.4) * base_angle2.cos();
+        let base_y2 = center_y + (size * 0.4) * base_angle2.sin();
         
-        // Create triangle for arrow
-        vertices.push(Vertex { position: [tip_x, tip_y, 0.02], color });
-        vertices.push(Vertex { position: [base_x1, base_y1, 0.02], color });
-        vertices.push(Vertex { position: [base_x2, base_y2, 0.02], color });
+        // Create triangle for arrow - positioned higher above road
+        vertices.push(Vertex { position: [tip_x, tip_y, 0.1], color });
+        vertices.push(Vertex { position: [base_x1, base_y1, 0.1], color });
+        vertices.push(Vertex { position: [base_x2, base_y2, 0.1], color });
     }
     
     fn create_car_instance(&self, car: &Car) -> CarInstance {
@@ -781,27 +781,15 @@ impl TrafficRenderer {
         let transform = translation * rotation * scale;
         let transform_array: [[f32; 4]; 4] = transform.into();
         
-        // Color based on driving behavior type
-        let base_color = match car.behavior_type.as_str() {
-            "aggressive" => [0.9, 0.2, 0.2],    // Red for aggressive drivers
-            "normal" => [0.2, 0.6, 0.9],        // Blue for normal drivers
-            "cautious" => [0.2, 0.8, 0.2],      // Green for cautious drivers
-            "erratic" => [0.9, 0.5, 0.1],       // Orange for erratic drivers
-            "strategic" => [0.7, 0.2, 0.9],     // Purple for strategic drivers
-            _ => [0.5, 0.5, 0.5],                // Gray for unknown behavior
+        // Color based on driving behavior type - make colors very distinct
+        let color = match car.behavior_type.as_str() {
+            "aggressive" => [1.0, 0.0, 0.0],    // Pure red for aggressive drivers
+            "normal" => [0.0, 0.5, 1.0],        // Pure blue for normal drivers  
+            "cautious" => [0.0, 1.0, 0.0],      // Pure green for cautious drivers
+            "erratic" => [1.0, 0.7, 0.0],       // Pure orange for erratic drivers
+            "strategic" => [1.0, 0.0, 1.0],     // Pure magenta for strategic drivers
+            _ => [0.8, 0.8, 0.8],                // Light gray for unknown behavior
         };
-        
-        // Modulate color intensity based on speed for additional visual feedback
-        let speed = car.velocity.magnitude();
-        let max_speed = 30.0;
-        let speed_ratio = (speed / max_speed).min(1.0);
-        let brightness = 0.7 + speed_ratio * 0.3; // Less aggressive brightness scaling
-        
-        let color = [
-            base_color[0] * brightness,
-            base_color[1] * brightness,
-            base_color[2] * brightness,
-        ];
         
         CarInstance {
             transform: transform_array,
