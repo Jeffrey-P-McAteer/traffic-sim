@@ -94,7 +94,7 @@ impl UiRenderer {
                     ui.label("WASD/Arrows: Move camera");
                     ui.label("Home: Reset view");
                     ui.label("Space: Pause/Resume");
-                    ui.label("1-5: Speed (0.25x-4x)");
+                    ui.label("1-9: Speed (1x-9x)");
                     ui.label("R: Reset simulation");
                     ui.label("ESC: Exit");
                 });

@@ -252,13 +252,8 @@ impl Application {
     }
     
     fn handle_input(&mut self, event: &WindowEvent) -> bool {
-        // Handle graphics input first
-        if self.graphics.handle_input(event) {
-            return true;
-        }
-        
-        // Handle application-specific input
-        match event {
+        // Handle application-specific input first (simulation controls)
+        let handled_by_app = match event {
             WindowEvent::KeyboardInput { 
                 event: winit::event::KeyEvent {
                     state: ElementState::Pressed,
@@ -279,34 +274,50 @@ impl Application {
                         info!("Simulation reset");
                         true
                     }
+                    // Speed controls: 1-9 for 1x to 9x speeds
                     winit::keyboard::KeyCode::Digit1 => {
-                        self.simulation_speed = 0.25;
-                        info!("Simulation speed: 0.25x");
-                        true
-                    }
-                    winit::keyboard::KeyCode::Digit2 => {
-                        self.simulation_speed = 0.5;
-                        info!("Simulation speed: 0.5x");
-                        true
-                    }
-                    winit::keyboard::KeyCode::Digit3 => {
                         self.simulation_speed = 1.0;
                         info!("Simulation speed: 1.0x");
                         true
                     }
-                    winit::keyboard::KeyCode::Digit4 => {
+                    winit::keyboard::KeyCode::Digit2 => {
                         self.simulation_speed = 2.0;
                         info!("Simulation speed: 2.0x");
                         true
                     }
-                    winit::keyboard::KeyCode::Digit5 => {
+                    winit::keyboard::KeyCode::Digit3 => {
+                        self.simulation_speed = 3.0;
+                        info!("Simulation speed: 3.0x");
+                        true
+                    }
+                    winit::keyboard::KeyCode::Digit4 => {
                         self.simulation_speed = 4.0;
                         info!("Simulation speed: 4.0x");
                         true
                     }
-                    winit::keyboard::KeyCode::F1 => {
-                        // Toggle performance display (would be implemented in UI)
-                        info!("Performance display toggled");
+                    winit::keyboard::KeyCode::Digit5 => {
+                        self.simulation_speed = 5.0;
+                        info!("Simulation speed: 5.0x");
+                        true
+                    }
+                    winit::keyboard::KeyCode::Digit6 => {
+                        self.simulation_speed = 6.0;
+                        info!("Simulation speed: 6.0x");
+                        true
+                    }
+                    winit::keyboard::KeyCode::Digit7 => {
+                        self.simulation_speed = 7.0;
+                        info!("Simulation speed: 7.0x");
+                        true
+                    }
+                    winit::keyboard::KeyCode::Digit8 => {
+                        self.simulation_speed = 8.0;
+                        info!("Simulation speed: 8.0x");
+                        true
+                    }
+                    winit::keyboard::KeyCode::Digit9 => {
+                        self.simulation_speed = 9.0;
+                        info!("Simulation speed: 9.0x");
                         true
                     }
                     winit::keyboard::KeyCode::Escape => {
@@ -317,7 +328,14 @@ impl Application {
                     _ => false
                 }
             }
-            _ => false
+            _ => false,
+        };
+        
+        // If app didn't handle the input, pass to graphics system
+        if handled_by_app {
+            true
+        } else {
+            self.graphics.handle_input(event)
         }
     }
     
