@@ -55,6 +55,9 @@ typedef struct {
     float speed_limit, min_speed;
     float following_distance, lane_change_time;
     float friction_coefficient;
+    float emergency_brake_distance;
+    float warning_distance;
+    float safety_margin;
 } RouteParams;
 
 __kernel void update_physics(
@@ -80,13 +83,19 @@ __kernel void update_physics(
     const float lane_offset = ((float)car->current_lane - 1.0f) * r->lane_width;
     const float target_radius = r->inner_radius + r->lane_width * 0.5f + lane_offset;
     
-    // Simple collision avoidance - find nearest car in front
+    // Find nearest car in front for collision avoidance
     float min_front_distance = INFINITY;
+    float front_car_speed = 0.0f;
+    
     for (uint i = 0; i < car_count; i++) {
         if (i == gid) continue;
         
         const __global Car* other = &cars[i];
-        if (other->current_lane != car->current_lane) continue;
+        // Only consider cars in same lane or target lane
+        if (other->current_lane != car->current_lane && 
+            (car->target_lane == 0 || other->current_lane != car->target_lane)) {
+            continue;
+        }
         
         const float other_to_car_x = other->pos_x - r->center_x;
         const float other_to_car_y = other->pos_y - r->center_y;
@@ -99,22 +108,38 @@ __kernel void update_physics(
         // Only consider cars in front (within PI radians)
         if (angle_diff > 0.0f && angle_diff < M_PI_F) {
             const float arc_distance = angle_diff * current_radius;
-            min_front_distance = min(min_front_distance, arc_distance);
+            if (arc_distance < min_front_distance) {
+                min_front_distance = arc_distance;
+                front_car_speed = sqrt(other->vel_x * other->vel_x + other->vel_y * other->vel_y);
+            }
         }
     }
     
-    // Calculate target speed based on traffic
+    // Calculate target speed based on traffic (matching CPU implementation)
     float target_speed = car->target_speed;
-    const float safety_margin = 5.0f;
-    const float emergency_brake_distance = 20.0f;
-    const float warning_distance = 40.0f;
     
-    if (min_front_distance < emergency_brake_distance) {
-        target_speed = 0.0f;
-    } else if (min_front_distance < warning_distance) {
-        const float brake_factor = (min_front_distance - emergency_brake_distance) / 
-                                 (warning_distance - emergency_brake_distance);
-        target_speed *= brake_factor;
+    // Use route collision avoidance parameters (from config)
+    const float emergency_brake_distance = r->emergency_brake_distance;
+    const float warning_distance = r->warning_distance;
+    const float safety_margin = r->safety_margin;
+    
+    // Calculate following distance (matching CPU implementation)
+    const float current_speed = sqrt(car->vel_x * car->vel_x + car->vel_y * car->vel_y);
+    const float base_following_distance = r->following_distance * current_speed;
+    const float following_distance = base_following_distance * car->following_distance_factor + safety_margin;
+    
+    // Apply collision avoidance logic
+    if (min_front_distance != INFINITY) {
+        if (min_front_distance < emergency_brake_distance) {
+            target_speed = 0.0f; // Emergency brake
+        } else if (min_front_distance < warning_distance) {
+            const float brake_factor = (min_front_distance - emergency_brake_distance) / 
+                                     (warning_distance - emergency_brake_distance);
+            target_speed *= brake_factor;
+        } else if (min_front_distance < following_distance) {
+            // Maintain following distance - match front car speed
+            target_speed = min(front_car_speed, target_speed);
+        }
     }
     
     // Apply speed limits
@@ -132,23 +157,18 @@ __kernel void update_physics(
     const float tangent_x = -sin(tangent_angle);
     const float tangent_y = cos(tangent_angle);
     
-    // Update velocity (tangential motion)
+    // Update velocity (tangential motion)  
     const float new_speed = max(0.0f, current_speed + accel_mag * dt);
     car->vel_x = tangent_x * new_speed;
     car->vel_y = tangent_y * new_speed;
     
-    // Update position
-    car->pos_x += car->vel_x * dt;
-    car->pos_y += car->vel_y * dt;
+    // Update position using angular motion (matching CPU implementation)
+    const float angular_velocity = target_speed / target_radius;
+    const float new_angle = current_angle + angular_velocity * dt;
     
-    // Correct position to maintain proper radius
-    const float pos_radius = sqrt((car->pos_x - r->center_x) * (car->pos_x - r->center_x) + 
-                                 (car->pos_y - r->center_y) * (car->pos_y - r->center_y));
-    if (pos_radius > 0.0f) {
-        const float radius_correction = target_radius / pos_radius;
-        car->pos_x = r->center_x + (car->pos_x - r->center_x) * radius_correction;
-        car->pos_y = r->center_y + (car->pos_y - r->center_y) * radius_correction;
-    }
+    // Calculate new position on the circle
+    car->pos_x = r->center_x + target_radius * cos(new_angle);
+    car->pos_y = r->center_y + target_radius * sin(new_angle);
     
     // Update heading
     car->heading = atan2(car->vel_y, car->vel_x);
@@ -192,7 +212,7 @@ impl GpuBackend {
             .map_err(|e| anyhow!("Failed to create physics kernel: {}", e))?;
         
         // Create route parameters buffer
-        let route_params = Self::create_route_params(&route_config);
+        let route_params = Self::create_route_params(&route_config, &cars_config.collision_avoidance);
         let mut route_buffer = unsafe {
             Buffer::create(&context, CL_MEM_READ_ONLY, std::mem::size_of::<RouteParams>(), ptr::null_mut())
                 .map_err(|e| anyhow!("Failed to create route buffer: {}", e))?
@@ -225,7 +245,7 @@ impl GpuBackend {
         })
     }
     
-    fn create_route_params(route_config: &RouteConfig) -> RouteParams {
+    fn create_route_params(route_config: &RouteConfig, collision_avoidance: &crate::config::CollisionAvoidance) -> RouteParams {
         let route = &route_config.route;
         let geom = &route.geometry;
         let rules = &route.traffic_rules;
@@ -243,6 +263,9 @@ impl GpuBackend {
             following_distance: rules.following_distance,
             lane_change_time: rules.lane_change_time,
             friction_coefficient: surface.friction_coefficient,
+            emergency_brake_distance: collision_avoidance.emergency_brake_distance,
+            warning_distance: collision_avoidance.warning_distance,
+            safety_margin: collision_avoidance.safety_margin,
         }
     }
     
@@ -366,6 +389,9 @@ struct RouteParams {
     following_distance: f32,
     lane_change_time: f32,
     friction_coefficient: f32,
+    emergency_brake_distance: f32,
+    warning_distance: f32,
+    safety_margin: f32,
 }
 
 #[repr(C)]
