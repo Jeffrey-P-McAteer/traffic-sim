@@ -37,6 +37,10 @@ struct Args {
     /// Enable verbose logging for detailed simulation progress
     #[arg(short, long)]
     verbose: bool,
+    
+    /// UI font size (default: 14.0)
+    #[arg(long, default_value_t = 14.0)]
+    font_size: f32,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
@@ -60,6 +64,7 @@ struct Application {
     route_file: String,
     cars_file: String,
     frame_count: u64,
+    font_size: f32,
     should_exit: bool,
 }
 
@@ -182,6 +187,7 @@ impl Application {
             route_file: args.route.clone(),
             cars_file: args.cars.clone(),
             frame_count: 0,
+            font_size: args.font_size,
             should_exit: false,
         })
     }
@@ -243,7 +249,8 @@ impl Application {
             self.simulation_speed,
             self.frame_count,
             &self.route_file,
-            &self.cars_file
+            &self.cars_file,
+            self.font_size
         )?;
         
         self.performance_tracker.end_render();

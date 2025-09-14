@@ -111,7 +111,8 @@ impl GraphicsSystem {
         simulation_speed: f32,
         frame_count: u64,
         route_file: &str,
-        cars_file: &str
+        cars_file: &str,
+        font_size: f32
     ) -> Result<()> {
         // Update viewport
         self.viewport.update();
@@ -134,7 +135,7 @@ impl GraphicsSystem {
         let raw_input = self.egui_winit.take_egui_input(&self.window);
         let full_output = self.egui_ctx.run(raw_input, |ctx| {
             // Render UI overlay with egui
-            self.ui.render_egui(ctx, performance, state, &self.viewport, paused, simulation_speed, frame_count, route_file, cars_file);
+            self.ui.render_egui(ctx, performance, state, &self.viewport, paused, simulation_speed, frame_count, route_file, cars_file, font_size);
         });
         
         self.egui_winit.handle_platform_output(&self.window, full_output.platform_output);

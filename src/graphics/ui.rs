@@ -22,6 +22,7 @@ impl UiRenderer {
         frame_count: u64,
         route_file: &str,
         cars_file: &str,
+        font_size: f32,
     ) {
         let fps = if !performance.frame_time.is_zero() {
             1.0 / performance.frame_time.as_secs_f32()
@@ -30,6 +31,18 @@ impl UiRenderer {
         };
         
         let status = if paused { "PAUSED" } else { "RUNNING" };
+        
+        // Configure font size for all text
+        ctx.style_mut(|style| {
+            style.text_styles.insert(
+                egui::TextStyle::Body,
+                egui::FontId::new(font_size, egui::FontFamily::Monospace),
+            );
+            style.text_styles.insert(
+                egui::TextStyle::Monospace,
+                egui::FontId::new(font_size, egui::FontFamily::Monospace),
+            );
+        });
         
         // Status overlay in the lower-left corner
         egui::Area::new(egui::Id::new("status_overlay"))
@@ -45,7 +58,7 @@ impl UiRenderer {
                     );
                     
                     ui.spacing_mut().item_spacing = egui::vec2(0.0, 2.0);
-                    ui.style_mut().override_text_style = Some(egui::TextStyle::Monospace);
+                    ui.style_mut().override_text_style = Some(egui::TextStyle::Body);
                     
                     // Status section
                     ui.colored_label(
@@ -87,7 +100,7 @@ impl UiRenderer {
                     );
                     
                     ui.spacing_mut().item_spacing = egui::vec2(0.0, 2.0);
-                    ui.style_mut().override_text_style = Some(egui::TextStyle::Small);
+                    ui.style_mut().override_text_style = Some(egui::TextStyle::Body);
                     
                     ui.colored_label(egui::Color32::WHITE, "=== CONTROLS ===");
                     ui.label("Mouse: Drag=pan, Wheel=zoom");
