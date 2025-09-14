@@ -2,6 +2,7 @@ use anyhow::Result;
 use log::info;
 use std::time::Instant;
 use clap::{Parser, ValueEnum};
+use rand::Rng;
 use winit::{
     event::*,
     event_loop::EventLoop,
@@ -63,6 +64,7 @@ struct Application {
     verbose: bool,
     route_file: String,
     cars_file: String,
+    seed: Option<u64>,
     frame_count: u64,
     font_size: f32,
     should_exit: bool,
@@ -114,8 +116,11 @@ impl Application {
         let dt = 1.0 / 60.0; // 60 FPS simulation timestep
         let simulation_state = SimulationState::new(dt);
         
-        // Use seed from args or config
-        let seed = args.seed.or(config.cars.random.seed);
+        // Use seed from args, config, or generate a random one
+        let seed = args.seed.or(config.cars.random.seed).or_else(|| {
+            let random_seed = rand::thread_rng().gen::<u64>();
+            Some(random_seed)
+        });
         
         // Initialize compute backend based on CLI argument
         let compute_backend = match args.backend {
@@ -186,6 +191,7 @@ impl Application {
             verbose: args.verbose,
             route_file: args.route.clone(),
             cars_file: args.cars.clone(),
+            seed,
             frame_count: 0,
             font_size: args.font_size,
             should_exit: false,
@@ -250,6 +256,7 @@ impl Application {
             self.frame_count,
             &self.route_file,
             &self.cars_file,
+            self.seed,
             self.font_size
         )?;
         

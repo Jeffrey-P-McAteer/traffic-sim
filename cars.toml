@@ -118,7 +118,7 @@ entry_intervals = [
 
 # Random seed for reproducible simulations
 [random]
-seed = 42
+# seed = 42  # Uncomment and set a specific value for reproducible simulations
 
 # Performance monitoring
 [performance]

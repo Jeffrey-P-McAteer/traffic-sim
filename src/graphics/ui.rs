@@ -22,6 +22,7 @@ impl UiRenderer {
         frame_count: u64,
         route_file: &str,
         cars_file: &str,
+        seed: Option<u64>,
         font_size: f32,
     ) {
         let fps = if !performance.frame_time.is_zero() {
@@ -76,6 +77,12 @@ impl UiRenderer {
                     // Files section
                     ui.label(format!("Route: {}", route_file));
                     ui.label(format!("Cars: {}", cars_file));
+                    
+                    // Seed information for reproducibility
+                    match seed {
+                        Some(s) => ui.label(format!("Seed: {}", s)),
+                        None => ui.label("Seed: random"),
+                    };
                     
                     ui.add_space(10.0);
                     
