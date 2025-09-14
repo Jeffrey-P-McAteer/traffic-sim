@@ -148,6 +148,14 @@ impl UiRenderer {
                     ui.colored_label(egui::Color32::WHITE, "=== HIGHWAY SYMBOLS ===");
                     ui.colored_label(egui::Color32::from_rgb(0, 200, 0), "▲ Entry Points");
                     ui.colored_label(egui::Color32::from_rgb(200, 0, 0), "▲ Exit Points");
+                    ui.colored_label(egui::Color32::from_rgb(230, 200, 50), "~ Merge Zones");
+                    
+                    ui.add_space(10.0);
+                    
+                    ui.colored_label(egui::Color32::WHITE, "=== LANES ===");
+                    ui.colored_label(egui::Color32::WHITE, "Lane 1: Inner (Entry)");
+                    ui.colored_label(egui::Color32::WHITE, "Lane 2: Middle (Travel)");
+                    ui.colored_label(egui::Color32::WHITE, "Lane 3: Outer (Exit)");
                 });
             });
     }

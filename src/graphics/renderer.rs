@@ -545,36 +545,49 @@ impl TrafficRenderer {
         let lane_width = 3.5;
         let lane_count = 3;
         
-        // Create the road surface
+        // Create the road surface with individual lane visualization
         for i in 0..segments {
             let angle1 = (i as f32) * 2.0 * std::f32::consts::PI / (segments as f32);
             let angle2 = ((i + 1) as f32) * 2.0 * std::f32::consts::PI / (segments as f32);
             
-            // Inner edge
-            let inner1 = [inner_radius * angle1.cos(), inner_radius * angle1.sin(), 0.0];
-            let inner2 = [inner_radius * angle2.cos(), inner_radius * angle2.sin(), 0.0];
-            
-            // Outer edge
-            let outer1 = [outer_radius * angle1.cos(), outer_radius * angle1.sin(), 0.0];
-            let outer2 = [outer_radius * angle2.cos(), outer_radius * angle2.sin(), 0.0];
-            
-            let road_color = [0.2, 0.2, 0.2]; // Dark gray for asphalt
-            
-            // Create two triangles for each segment
-            vertices.push(Vertex { position: inner1, color: road_color });
-            vertices.push(Vertex { position: outer1, color: road_color });
-            vertices.push(Vertex { position: inner2, color: road_color });
-            
-            vertices.push(Vertex { position: inner2, color: road_color });
-            vertices.push(Vertex { position: outer1, color: road_color });
-            vertices.push(Vertex { position: outer2, color: road_color });
+            // Render each lane individually with subtle color variations
+            for lane in 0..lane_count {
+                let lane_inner_radius = inner_radius + lane_width * lane as f32;
+                let lane_outer_radius = inner_radius + lane_width * (lane + 1) as f32;
+                
+                // Alternate lane colors for better visibility
+                let base_gray = 0.2;
+                let color_variation = if lane % 2 == 0 { 0.0 } else { 0.03 };
+                let lane_color = [
+                    base_gray + color_variation,
+                    base_gray + color_variation,
+                    base_gray + color_variation
+                ];
+                
+                // Inner edge of this lane
+                let inner1 = [lane_inner_radius * angle1.cos(), lane_inner_radius * angle1.sin(), 0.0];
+                let inner2 = [lane_inner_radius * angle2.cos(), lane_inner_radius * angle2.sin(), 0.0];
+                
+                // Outer edge of this lane
+                let outer1 = [lane_outer_radius * angle1.cos(), lane_outer_radius * angle1.sin(), 0.0];
+                let outer2 = [lane_outer_radius * angle2.cos(), lane_outer_radius * angle2.sin(), 0.0];
+                
+                // Create two triangles for each lane segment
+                vertices.push(Vertex { position: inner1, color: lane_color });
+                vertices.push(Vertex { position: outer1, color: lane_color });
+                vertices.push(Vertex { position: inner2, color: lane_color });
+                
+                vertices.push(Vertex { position: inner2, color: lane_color });
+                vertices.push(Vertex { position: outer1, color: lane_color });
+                vertices.push(Vertex { position: outer2, color: lane_color });
+            }
         }
         
-        // Add lane markings (white dashed lines between lanes)
-        let line_width = 0.15;
+        // Add enhanced lane markings (white dashed lines between lanes)
+        let line_width = 0.2; // Slightly wider for better visibility
         let dash_length = 3.0; // meters
         let dash_spacing = 6.0; // meters
-        let white_color = [0.9, 0.9, 0.9];
+        let white_color = [0.95, 0.95, 0.95]; // Brighter white
         
         for lane in 1..lane_count {
             let lane_radius = inner_radius + lane_width * lane as f32;
@@ -596,10 +609,10 @@ impl TrafficRenderer {
                     let inner_r = lane_radius - line_width * 0.5;
                     let outer_r = lane_radius + line_width * 0.5;
                     
-                    let p1 = [inner_r * a1.cos(), inner_r * a1.sin(), 0.01]; // Slightly above road
-                    let p2 = [outer_r * a1.cos(), outer_r * a1.sin(), 0.01];
-                    let p3 = [inner_r * a2.cos(), inner_r * a2.sin(), 0.01];
-                    let p4 = [outer_r * a2.cos(), outer_r * a2.sin(), 0.01];
+                    let p1 = [inner_r * a1.cos(), inner_r * a1.sin(), 0.02]; // Higher above road
+                    let p2 = [outer_r * a1.cos(), outer_r * a1.sin(), 0.02];
+                    let p3 = [inner_r * a2.cos(), inner_r * a2.sin(), 0.02];
+                    let p4 = [outer_r * a2.cos(), outer_r * a2.sin(), 0.02];
                     
                     // Two triangles for the dash segment
                     vertices.push(Vertex { position: p1, color: white_color });
@@ -609,6 +622,46 @@ impl TrafficRenderer {
                     vertices.push(Vertex { position: p3, color: white_color });
                     vertices.push(Vertex { position: p2, color: white_color });
                     vertices.push(Vertex { position: p4, color: white_color });
+                }
+            }
+        }
+        
+        // Add merge zone indicators near entry points (yellow markings)
+        let merge_color = [0.9, 0.8, 0.2]; // Yellow for merge zones
+        let merge_zones = [0.0, 180.0]; // Degrees where entry points are located
+        
+        for &entry_angle in &merge_zones {
+            let merge_start_angle = (entry_angle - 15.0_f32).to_radians(); // 15 degrees before entry
+            let merge_end_angle = (entry_angle + 15.0_f32).to_radians(); // 15 degrees after entry
+            
+            // Add merge zone marking in lane 1 (where cars enter)
+            let merge_lane = 1;
+            let merge_radius = inner_radius + lane_width * merge_lane as f32;
+            
+            let merge_segments = 16;
+            for i in 0..merge_segments {
+                let t1 = i as f32 / merge_segments as f32;
+                let t2 = (i + 1) as f32 / merge_segments as f32;
+                let a1 = merge_start_angle + (merge_end_angle - merge_start_angle) * t1;
+                let a2 = merge_start_angle + (merge_end_angle - merge_start_angle) * t2;
+                
+                let inner_r = merge_radius - 0.3;
+                let outer_r = merge_radius + 0.3;
+                
+                let p1 = [inner_r * a1.cos(), inner_r * a1.sin(), 0.03];
+                let p2 = [outer_r * a1.cos(), outer_r * a1.sin(), 0.03];
+                let p3 = [inner_r * a2.cos(), inner_r * a2.sin(), 0.03];
+                let p4 = [outer_r * a2.cos(), outer_r * a2.sin(), 0.03];
+                
+                // Create chevron-like pattern for merge zones
+                if i % 4 < 2 { // Create dashed pattern
+                    vertices.push(Vertex { position: p1, color: merge_color });
+                    vertices.push(Vertex { position: p2, color: merge_color });
+                    vertices.push(Vertex { position: p3, color: merge_color });
+                    
+                    vertices.push(Vertex { position: p3, color: merge_color });
+                    vertices.push(Vertex { position: p2, color: merge_color });
+                    vertices.push(Vertex { position: p4, color: merge_color });
                 }
             }
         }
