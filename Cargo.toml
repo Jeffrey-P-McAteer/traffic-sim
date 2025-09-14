@@ -7,16 +7,16 @@ description = "GPU-accelerated traffic simulation with interactive visualization
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-# Graphics and windowing
-wgpu = { version = "0.20", optional = true }
-winit = { version = "0.29", optional = true }
-vello = { version = "0.2", optional = true }
-kurbo = { version = "0.11", optional = true }        # 2D curves and shapes (used by Vello)
-bytemuck = { version = "1.14", features = ["derive"], optional = true }
+# Graphics and windowing (always enabled)
+wgpu = "0.20"
+winit = "0.29"
+vello = "0.2"
+kurbo = "0.11"        # 2D curves and shapes (used by Vello)
+bytemuck = { version = "1.14", features = ["derive"] }
 
 # OpenCL for GPU compute acceleration
-opencl3 = { version = "0.10", optional = true }
-ocl = { version = "0.19", optional = true }
+opencl3 = "0.10"
+ocl = "0.19"
 
 # Configuration and serialization  
 toml = "0.8"
@@ -30,8 +30,8 @@ rand_distr = "0.4"
 # Performance monitoring
 instant = "0.1"       # Cross-platform timing
 
-# Async runtime for event handling
-tokio = { version = "1.0", features = ["full"], optional = true }
+# Async runtime (always enabled)
+tokio = { version = "1.0", features = ["full"] }
 pollster = "0.3"      # Simple async executor
 
 # Error handling and utilities
@@ -40,13 +40,10 @@ thiserror = "1.0"
 log = "0.4"
 env_logger = "0.11"
 
-[features]
-default = ["cpu-sim"]
-cpu-sim = []          # Enable CPU-based simulation
-gpu-sim = ["opencl3"] # Enable OpenCL GPU simulation  
-gpu-graphics = ["wgpu", "winit", "vello", "kurbo", "bytemuck"] # Enable GPU graphics
-alternative-ocl = ["ocl"] # Alternative OpenCL bindings
-async = ["tokio"]     # Async runtime support
+# CLI argument parsing
+clap = { version = "4.0", features = ["derive"] }
+
+# No features needed - everything is always available
 
 [[bin]]
 name = "traffic-sim"

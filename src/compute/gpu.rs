@@ -1,4 +1,3 @@
-#[cfg(feature = "gpu-sim")]
 use opencl3::{
     context::Context,
     device::{Device, get_all_devices, CL_DEVICE_TYPE_GPU},
@@ -6,7 +5,7 @@ use opencl3::{
     memory::{Buffer, CL_MEM_READ_WRITE, CL_MEM_READ_ONLY},
     program::Program,
     command_queue::{CommandQueue, CL_QUEUE_PROFILING_ENABLE},
-    Result as ClResult,
+    types::{CL_TRUE, cl_float},
 };
 
 use crate::simulation::{SimulationState, TrafficManager, Car, CarId};
@@ -15,19 +14,17 @@ use anyhow::{Result, anyhow};
 use super::SimulationBackend;
 use std::ptr;
 
-#[cfg(feature = "gpu-sim")]
 pub struct GpuBackend {
     context: Context,
     queue: CommandQueue,
     program: Program,
     physics_kernel: Kernel,
     traffic_manager: TrafficManager,
-    car_buffer: Option<Buffer<cl_float>>,
-    route_buffer: Buffer<cl_float>,
+    car_buffer: Option<Buffer<u8>>,
+    route_buffer: Buffer<u8>,
     max_cars: usize,
 }
 
-#[cfg(feature = "gpu-sim")]
 const PHYSICS_KERNEL_SOURCE: &str = r#"
 // Car data structure (matches Rust Car struct layout)
 typedef struct {
@@ -162,7 +159,6 @@ __kernel void update_physics(
 }
 "#;
 
-#[cfg(feature = "gpu-sim")]
 impl GpuBackend {
     pub fn new(
         cars_config: CarsConfig, 
@@ -197,11 +193,19 @@ impl GpuBackend {
         
         // Create route parameters buffer
         let route_params = Self::create_route_params(&route_config);
-        let route_buffer = Buffer::create(&context, CL_MEM_READ_ONLY, std::mem::size_of::<RouteParams>(), ptr::null_mut())
-            .map_err(|e| anyhow!("Failed to create route buffer: {}", e))?;
+        let mut route_buffer = unsafe {
+            Buffer::create(&context, CL_MEM_READ_ONLY, std::mem::size_of::<RouteParams>(), ptr::null_mut())
+                .map_err(|e| anyhow!("Failed to create route buffer: {}", e))?
+        };
         
         // Upload route data
-        queue.enqueue_write_buffer(&route_buffer, CL_TRUE, 0, &[route_params], &[])
+        unsafe {
+            let route_bytes = std::slice::from_raw_parts(
+                &route_params as *const _ as *const u8,
+                std::mem::size_of::<RouteParams>()
+            );
+            queue.enqueue_write_buffer(&mut route_buffer, CL_TRUE, 0, route_bytes, &[])
+        }
             .map_err(|e| anyhow!("Failed to write route data: {}", e))?;
         
         // Create traffic manager for CPU-side logic
@@ -250,10 +254,10 @@ impl GpuBackend {
         // Create or resize buffer if needed
         let buffer_size = self.max_cars * std::mem::size_of::<GpuCar>();
         if self.car_buffer.is_none() {
-            self.car_buffer = Some(
+            self.car_buffer = Some(unsafe {
                 Buffer::create(&self.context, CL_MEM_READ_WRITE, buffer_size, ptr::null_mut())
                     .map_err(|e| anyhow!("Failed to create car buffer: {}", e))?
-            );
+            });
         }
         
         // Convert cars to GPU format
@@ -265,8 +269,14 @@ impl GpuBackend {
         }
         
         // Upload to GPU
-        if let Some(ref buffer) = self.car_buffer {
-            self.queue.enqueue_write_buffer(buffer, CL_TRUE, 0, &gpu_cars, &[])
+        if let Some(ref mut buffer) = self.car_buffer {
+            unsafe {
+                let car_bytes = std::slice::from_raw_parts(
+                    gpu_cars.as_ptr() as *const u8,
+                    gpu_cars.len() * std::mem::size_of::<GpuCar>()
+                );
+                self.queue.enqueue_write_buffer(buffer, CL_TRUE, 0, car_bytes, &[])
+            }
                 .map_err(|e| anyhow!("Failed to upload cars to GPU: {}", e))?;
         }
         
@@ -277,7 +287,13 @@ impl GpuBackend {
         if let Some(ref buffer) = self.car_buffer {
             let mut gpu_cars = vec![GpuCar::default(); self.max_cars];
             
-            self.queue.enqueue_read_buffer(buffer, CL_TRUE, 0, &mut gpu_cars, &[])
+            unsafe {
+                let car_bytes = std::slice::from_raw_parts_mut(
+                    gpu_cars.as_mut_ptr() as *mut u8,
+                    gpu_cars.len() * std::mem::size_of::<GpuCar>()
+                );
+                self.queue.enqueue_read_buffer(buffer, CL_TRUE, 0, car_bytes, &[])
+            }
                 .map_err(|e| anyhow!("Failed to download cars from GPU: {}", e))?;
             
             // Update car data
@@ -292,7 +308,6 @@ impl GpuBackend {
     }
 }
 
-#[cfg(feature = "gpu-sim")]
 impl SimulationBackend for GpuBackend {
     fn update(&mut self, state: &mut SimulationState) -> Result<()> {
         // Handle traffic management on CPU (spawning, despawning, behavior decisions)
@@ -304,15 +319,17 @@ impl SimulationBackend for GpuBackend {
             
             // Execute physics kernel
             if let Some(ref car_buffer) = self.car_buffer {
-                let kernel_event = ExecuteKernel::new(&self.physics_kernel)
-                    .set_arg(car_buffer)
-                    .set_arg(&self.route_buffer)
-                    .set_arg(&state.dt)
-                    .set_arg(&(state.cars.len() as u32))
-                    .set_arg(&state.time)
-                    .set_global_work_size(state.cars.len())
-                    .enqueue_nd_range(&self.queue)
-                    .map_err(|e| anyhow!("Failed to execute physics kernel: {}", e))?;
+                let kernel_event = unsafe {
+                    ExecuteKernel::new(&self.physics_kernel)
+                        .set_arg(car_buffer)
+                        .set_arg(&self.route_buffer)
+                        .set_arg(&state.dt)
+                        .set_arg(&(state.cars.len() as u32))
+                        .set_arg(&state.time)
+                        .set_global_work_size(state.cars.len())
+                        .enqueue_nd_range(&self.queue)
+                        .map_err(|e| anyhow!("Failed to execute physics kernel: {}", e))?
+                };
                 
                 // Wait for completion
                 kernel_event.wait()
@@ -376,9 +393,8 @@ struct GpuCar {
     padding: [f32; 2],
 }
 
-#[cfg(feature = "gpu-sim")]
 impl GpuCar {
-    fn from_car(car: &Car, simulation_time: f32) -> Self {
+    fn from_car(car: &Car, _simulation_time: f32) -> Self {
         Self {
             pos_x: car.position.x,
             pos_y: car.position.y,
@@ -426,32 +442,3 @@ impl GpuCar {
     }
 }
 
-// Stubs for when GPU feature is not enabled
-#[cfg(not(feature = "gpu-sim"))]
-pub struct GpuBackend;
-
-#[cfg(not(feature = "gpu-sim"))]
-impl GpuBackend {
-    pub fn new(
-        _cars_config: CarsConfig, 
-        _route_config: RouteConfig,
-        _seed: Option<u64>
-    ) -> Result<Self> {
-        Err(anyhow!("GPU backend not compiled. Enable 'gpu-sim' feature."))
-    }
-}
-
-#[cfg(not(feature = "gpu-sim"))]
-impl SimulationBackend for GpuBackend {
-    fn update(&mut self, _state: &mut SimulationState) -> Result<()> {
-        Err(anyhow!("GPU backend not available"))
-    }
-    
-    fn get_name(&self) -> &'static str {
-        "GPU (Not Available)"
-    }
-    
-    fn supports_gpu(&self) -> bool {
-        false
-    }
-}

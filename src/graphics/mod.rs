@@ -15,7 +15,7 @@ pub use viewport::*;
 pub use ui::*;
 
 pub struct GraphicsSystem {
-    pub window: Window,
+    pub window: std::sync::Arc<Window>,
     pub renderer: TrafficRenderer,
     pub viewport: Viewport,
     pub ui: UiRenderer,
@@ -23,19 +23,14 @@ pub struct GraphicsSystem {
 
 impl GraphicsSystem {
     pub async fn new(event_loop: &EventLoop<()>) -> Result<Self> {
-        let window = match event_loop.create_window(
-            winit::window::Window::default_attributes()
+        let window = std::sync::Arc::new(
+            winit::window::WindowBuilder::new()
                 .with_title("Traffic Simulator")
                 .with_inner_size(winit::dpi::LogicalSize::new(1200, 800))
-        ) {
-            Ok(window) => window,
-            Err(_) => {
-                // Fallback for older winit versions
-                return Err(anyhow::anyhow!("Failed to create window"));
-            }
-        };
+                .build(event_loop)?
+        );
         
-        let renderer = TrafficRenderer::new(&window).await?;
+        let renderer = TrafficRenderer::new(window.clone()).await?;
         let viewport = Viewport::new(1200.0, 800.0);
         let ui = UiRenderer::new()?;
         

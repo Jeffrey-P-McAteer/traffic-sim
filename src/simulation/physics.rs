@@ -87,7 +87,7 @@ impl PhysicsEngine {
         // Calculate acceleration
         let current_speed = car.velocity.magnitude();
         let speed_diff = target_speed - current_speed;
-        let acceleration_magnitude = if speed_diff > 0.0 {
+        let _acceleration_magnitude = if speed_diff > 0.0 {
             (speed_diff / dt).min(car.max_acceleration)
         } else {
             (speed_diff / dt).max(-car.max_deceleration)

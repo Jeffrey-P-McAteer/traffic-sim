@@ -161,7 +161,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 "#;
 
 impl TrafficRenderer {
-    pub async fn new(window: &Window) -> Result<Self> {
+    pub async fn new(window: std::sync::Arc<Window>) -> Result<Self> {
         let size = window.inner_size();
         
         // Create wgpu instance
@@ -173,7 +173,7 @@ impl TrafficRenderer {
         });
         
         // Create surface
-        let surface = unsafe { instance.create_surface(window)? };
+        let surface = instance.create_surface(window.clone())?;
         
         // Request adapter
         let adapter = instance
