@@ -69,4 +69,9 @@ impl ComputeBackend {
             }
         }
     }
+    
+    pub fn mark_car_for_exit(&mut self, behavior_name: &str, state: &mut SimulationState) -> bool {
+        // This is handled directly in the simulation state
+        state.mark_car_for_exit(behavior_name)
+    }
 }

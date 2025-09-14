@@ -68,6 +68,7 @@ struct Application {
     frame_count: u64,
     font_size: f32,
     should_exit: bool,
+    shift_pressed: bool,
 }
 
 impl Application {
@@ -195,6 +196,7 @@ impl Application {
             frame_count: 0,
             font_size: args.font_size,
             should_exit: false,
+            shift_pressed: false,
         })
     }
     
@@ -269,6 +271,12 @@ impl Application {
     }
     
     fn handle_input(&mut self, event: &WindowEvent) -> bool {
+        // Handle modifier state changes
+        if let WindowEvent::ModifiersChanged(modifiers) = event {
+            self.shift_pressed = modifiers.state().shift_key();
+            return false; // Let other handlers process this too
+        }
+        
         // Handle application-specific input first (simulation controls)
         let handled_by_app = match event {
             WindowEvent::KeyboardInput { 
@@ -279,6 +287,8 @@ impl Application {
                 },
                 ..
             } => {
+                // Check for Shift modifier using winit's modifiers state
+                // We'll need to track modifiers separately since winit doesn't provide them in KeyEvent
                 match keycode {
                     winit::keyboard::KeyCode::Space => {
                         self.paused = !self.paused;
@@ -342,25 +352,45 @@ impl Application {
                         self.should_exit = true;
                         true
                     }
-                    // Manual car spawning by behavior type
+                    // Manual car spawning/removal by behavior type
                     winit::keyboard::KeyCode::KeyA => {
-                        self.spawn_manual_car("aggressive");
+                        if self.shift_pressed {
+                            self.remove_car("aggressive");
+                        } else {
+                            self.spawn_manual_car("aggressive");
+                        }
                         true
                     }
                     winit::keyboard::KeyCode::KeyN => {
-                        self.spawn_manual_car("normal");
+                        if self.shift_pressed {
+                            self.remove_car("normal");
+                        } else {
+                            self.spawn_manual_car("normal");
+                        }
                         true
                     }
                     winit::keyboard::KeyCode::KeyC => {
-                        self.spawn_manual_car("cautious");
+                        if self.shift_pressed {
+                            self.remove_car("cautious");
+                        } else {
+                            self.spawn_manual_car("cautious");
+                        }
                         true
                     }
                     winit::keyboard::KeyCode::KeyE => {
-                        self.spawn_manual_car("erratic");
+                        if self.shift_pressed {
+                            self.remove_car("erratic");
+                        } else {
+                            self.spawn_manual_car("erratic");
+                        }
                         true
                     }
                     winit::keyboard::KeyCode::KeyS => {
-                        self.spawn_manual_car("strategic");
+                        if self.shift_pressed {
+                            self.remove_car("strategic");
+                        } else {
+                            self.spawn_manual_car("strategic");
+                        }
                         true
                     }
                     _ => false
@@ -380,6 +410,16 @@ impl Application {
     fn spawn_manual_car(&mut self, behavior_name: &str) {
         info!("Manually spawning {} car", behavior_name);
         self.compute_backend.spawn_manual_car(behavior_name, &mut self.simulation_state);
+    }
+    
+    fn remove_car(&mut self, behavior_name: &str) {
+        info!("Marking {} car for exit at next opportunity", behavior_name);
+        let marked = self.compute_backend.mark_car_for_exit(behavior_name, &mut self.simulation_state);
+        if marked {
+            info!("Successfully marked {} car for exit", behavior_name);
+        } else {
+            info!("No {} cars available to mark for exit", behavior_name);
+        }
     }
     
     fn update_frame_timing(&mut self) {

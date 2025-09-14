@@ -126,6 +126,15 @@ impl UiRenderer {
                     ui.colored_label(egui::Color32::from_rgb(50, 200, 50), "C: Spawn Cautious");
                     ui.colored_label(egui::Color32::from_rgb(230, 125, 25), "E: Spawn Erratic");
                     ui.colored_label(egui::Color32::from_rgb(180, 50, 230), "S: Spawn Strategic");
+                    
+                    ui.add_space(10.0);
+                    
+                    ui.colored_label(egui::Color32::WHITE, "=== REMOVE CARS ===");
+                    ui.colored_label(egui::Color32::from_rgb(230, 50, 50), "Shift+A: Remove Aggressive");
+                    ui.colored_label(egui::Color32::from_rgb(50, 150, 230), "Shift+N: Remove Normal");
+                    ui.colored_label(egui::Color32::from_rgb(50, 200, 50), "Shift+C: Remove Cautious");
+                    ui.colored_label(egui::Color32::from_rgb(230, 125, 25), "Shift+E: Remove Erratic");
+                    ui.colored_label(egui::Color32::from_rgb(180, 50, 230), "Shift+S: Remove Strategic");
                 });
             });
         
@@ -307,6 +316,124 @@ impl UiRenderer {
                     ui.add_space(5.0);
                     ui.label(format!("Total cars: {}", state.active_cars));
                     ui.label(format!("Max speed: {:.1} mph", max_speed_mph));
+                });
+            });
+
+        // Pie chart for car behavior types below the velocity graph
+        egui::Area::new(egui::Id::new("pie_chart"))
+            .anchor(egui::Align2::RIGHT_TOP, egui::vec2(-15.0, 330.0))
+            .show(ctx, |ui| {
+                ui.with_layout(egui::Layout::top_down(egui::Align::LEFT), |ui| {
+                    // Semi-transparent background
+                    let rect = egui::Rect::from_min_size(
+                        ui.cursor().min,
+                        egui::vec2(280.0, 340.0)
+                    );
+                    ui.painter().rect_filled(
+                        rect.expand(5.0),
+                        5.0,
+                        egui::Color32::from_black_alpha(160)
+                    );
+
+                    ui.spacing_mut().item_spacing = egui::vec2(0.0, 2.0);
+                    ui.style_mut().override_text_style = Some(egui::TextStyle::Body);
+
+                    ui.colored_label(egui::Color32::WHITE, "=== CAR BEHAVIOR DISTRIBUTION ===");
+                    ui.add_space(5.0);
+
+                    // Draw pie chart
+                    let chart_center = egui::pos2(
+                        ui.cursor().min.x + 140.0, // Center horizontally
+                        ui.cursor().min.y + 80.0   // Position vertically
+                    );
+                    let chart_radius = 60.0;
+
+                    let total_cars = state.active_cars as f32;
+                    if total_cars > 0.0 {
+                        let mut start_angle = 0.0;
+                        let behavior_data = [
+                            ("aggressive", behavior_counts.get("aggressive").unwrap_or(&0), [230, 50, 50]),
+                            ("normal", behavior_counts.get("normal").unwrap_or(&0), [50, 150, 230]),
+                            ("cautious", behavior_counts.get("cautious").unwrap_or(&0), [50, 200, 50]),
+                            ("erratic", behavior_counts.get("erratic").unwrap_or(&0), [230, 125, 25]),
+                            ("strategic", behavior_counts.get("strategic").unwrap_or(&0), [180, 50, 230]),
+                        ];
+
+                        for (_behavior_name, &count, color_rgb) in behavior_data.iter() {
+                            if count > 0 {
+                                let slice_angle = (count as f32 / total_cars) * 2.0 * std::f32::consts::PI;
+
+                                // Draw pie slice
+                                let num_segments = (slice_angle * 20.0) as usize + 1;
+                                let mut points = vec![chart_center];
+
+                                for i in 0..=num_segments {
+                                    let angle = start_angle + (i as f32 / num_segments as f32) * slice_angle;
+                                    let x = chart_center.x + chart_radius * angle.cos();
+                                    let y = chart_center.y + chart_radius * angle.sin();
+                                    points.push(egui::pos2(x, y));
+                                }
+
+                                // Create triangle fan for the slice (no stroke to avoid focusing effect)
+                                for i in 1..points.len() - 1 {
+                                    let triangle = [points[0], points[i], points[i + 1]];
+                                    ui.painter().add(egui::epaint::Shape::convex_polygon(
+                                        triangle.to_vec(),
+                                        egui::Color32::from_rgb(color_rgb[0], color_rgb[1], color_rgb[2]),
+                                        egui::Stroke::NONE // Remove stroke to eliminate focusing effect
+                                    ));
+                                }
+
+                                // Draw label at middle of slice if slice is large enough
+                                if slice_angle > 0.2 {
+                                    let label_angle = start_angle + slice_angle / 2.0;
+                                    let label_x = chart_center.x + (chart_radius * 0.7) * label_angle.cos();
+                                    let label_y = chart_center.y + (chart_radius * 0.7) * label_angle.sin();
+
+                                    ui.painter().text(
+                                        egui::pos2(label_x, label_y),
+                                        egui::Align2::CENTER_CENTER,
+                                        count.to_string(),
+                                        egui::FontId::new(12.0, egui::FontFamily::Monospace),
+                                        egui::Color32::WHITE
+                                    );
+                                }
+
+                                start_angle += slice_angle;
+                            }
+                        }
+                    }
+
+                    // Always allocate space for pie chart first
+                    ui.allocate_space(egui::vec2(280.0, 130.0)); // More space for pie chart
+                    ui.add_space(10.0);
+
+                    // Draw legend below pie chart (outside the chart area)
+                    if total_cars > 0.0 {
+                        let behavior_data = [
+                            ("aggressive", behavior_counts.get("aggressive").unwrap_or(&0), [230, 50, 50]),
+                            ("normal", behavior_counts.get("normal").unwrap_or(&0), [50, 150, 230]),
+                            ("cautious", behavior_counts.get("cautious").unwrap_or(&0), [50, 200, 50]),
+                            ("erratic", behavior_counts.get("erratic").unwrap_or(&0), [230, 125, 25]),
+                            ("strategic", behavior_counts.get("strategic").unwrap_or(&0), [180, 50, 230]),
+                        ];
+
+                        for (behavior_name, &count, color_rgb) in behavior_data.iter() {
+                            if count > 0 {
+                                let percentage = (count as f32 / total_cars) * 100.0;
+                                ui.colored_label(
+                                    egui::Color32::from_rgb(color_rgb[0], color_rgb[1], color_rgb[2]),
+                                    format!("● {} {} ({:.1}%)",
+                                        count,
+                                        behavior_name.chars().next().unwrap().to_uppercase().collect::<String>() + &behavior_name[1..],
+                                        percentage
+                                    )
+                                );
+                            }
+                        }
+                    } else {
+                        ui.label("No cars in simulation");
+                    }
                 });
             });
     }

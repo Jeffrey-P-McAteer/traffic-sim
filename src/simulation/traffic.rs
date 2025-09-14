@@ -194,6 +194,7 @@ impl TrafficManager {
             behavior_type: behavior_name,
             car_type: car_type.id.clone(),
             speed_history: [initial_speed, initial_speed, initial_speed],
+            marked_for_exit: false,
         };
         
         state.add_car(car);
@@ -271,6 +272,7 @@ impl TrafficManager {
             behavior_type: behavior_name.to_string(),
             car_type: car_type.id.clone(),
             speed_history: [initial_speed, initial_speed, initial_speed],
+            marked_for_exit: false,
         };
         
         state.add_car(car);
@@ -325,7 +327,11 @@ impl TrafficManager {
             
             // Car is near exit and in correct lane
             if angle_diff < 5.0 && car.current_lane == exit.lane {
-                // Use behavior's exit probability
+                // Priority exit for cars marked for removal
+                if car.marked_for_exit {
+                    return true;
+                }
+                // Use behavior's exit probability for normal cars
                 return true; // For simplicity, always exit when near
             }
         }

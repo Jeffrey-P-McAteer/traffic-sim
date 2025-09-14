@@ -34,6 +34,7 @@ pub struct Car {
     pub behavior_type: String,
     pub car_type: String,
     pub speed_history: [f32; 3], // Last 3 speed measurements
+    pub marked_for_exit: bool, // Car should exit at next opportunity
 }
 
 impl Car {
@@ -141,6 +142,17 @@ impl SimulationState {
         }
         
         distribution
+    }
+    
+    pub fn mark_car_for_exit(&mut self, behavior_type: &str) -> bool {
+        // Find first car of this behavior type that's not already marked for exit
+        for car in &mut self.cars {
+            if car.behavior_type == behavior_type && !car.marked_for_exit {
+                car.marked_for_exit = true;
+                return true; // Successfully marked a car
+            }
+        }
+        false // No car of this type found
     }
 }
 
