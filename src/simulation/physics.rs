@@ -236,7 +236,7 @@ impl PhysicsEngine {
         match car.current_lane {
             // North-South Southbound (lanes 1-3)
             1..=3 => {
-                let lane_offset = (car.current_lane - 2) as f32 * route_geom.lane_width; // -3.5, 0, 3.5
+                let lane_offset = ((car.current_lane as i32) - 2) as f32 * route_geom.lane_width; // -3.5, 0, 3.5
                 let x_pos = lane_offset;
                 let y_pos = car.position.y - target_speed * dt;
                 let heading = -std::f32::consts::PI / 2.0; // Pointing south
@@ -246,7 +246,7 @@ impl PhysicsEngine {
             }
             // North-South Northbound (lanes 4-6)
             4..=6 => {
-                let lane_offset = (5 - car.current_lane) as f32 * route_geom.lane_width; // 3.5, 0, -3.5
+                let lane_offset = (5 - (car.current_lane as i32)) as f32 * route_geom.lane_width; // 3.5, 0, -3.5
                 let x_pos = lane_offset;
                 let y_pos = car.position.y + target_speed * dt;
                 let heading = std::f32::consts::PI / 2.0; // Pointing north
@@ -256,7 +256,7 @@ impl PhysicsEngine {
             }
             // East-West Westbound (lanes 7-9)
             7..=9 => {
-                let lane_offset = (8 - car.current_lane) as f32 * route_geom.lane_width; // 3.5, 0, -3.5
+                let lane_offset = (8 - (car.current_lane as i32)) as f32 * route_geom.lane_width; // 3.5, 0, -3.5
                 let y_pos = lane_offset;
                 let x_pos = car.position.x - target_speed * dt;
                 let heading = std::f32::consts::PI; // Pointing west
@@ -266,7 +266,7 @@ impl PhysicsEngine {
             }
             // East-West Eastbound (lanes 10-12)
             10..=12 => {
-                let lane_offset = (car.current_lane - 11) as f32 * route_geom.lane_width; // -3.5, 0, 3.5
+                let lane_offset = ((car.current_lane as i32) - 11) as f32 * route_geom.lane_width; // -3.5, 0, 3.5
                 let y_pos = lane_offset;
                 let x_pos = car.position.x + target_speed * dt;
                 let heading = 0.0; // Pointing east

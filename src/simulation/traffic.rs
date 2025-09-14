@@ -115,15 +115,8 @@ impl TrafficManager {
         state: &SimulationState, 
         route_geom: &crate::config::RouteGeometry
     ) -> bool {
-        let center = Point2::new(route_geom.center_x, route_geom.center_y);
-        
-        // Calculate entry position
-        let angle_rad = entry.angle.to_radians();
-        let radius = Self::get_lane_radius_static(entry.lane, route_geom);
-        let entry_pos = center + Vector2::new(
-            radius * angle_rad.cos(),
-            radius * angle_rad.sin()
-        );
+        // Calculate entry position based on geometry type
+        let entry_pos = Self::calculate_entry_position(entry, route_geom);
         
         // Check if there's space at the entry point
         let min_spawn_distance = 5.0; // Minimum distance from other cars (further reduced to allow spawning in traffic)
@@ -146,15 +139,8 @@ impl TrafficManager {
         state: &SimulationState, 
         route_geom: &crate::config::RouteGeometry
     ) -> bool {
-        let center = Point2::new(route_geom.center_x, route_geom.center_y);
-        
-        // Calculate entry position
-        let angle_rad = entry.angle.to_radians();
-        let radius = Self::get_lane_radius_static(entry.lane, route_geom);
-        let entry_pos = center + Vector2::new(
-            radius * angle_rad.cos(),
-            radius * angle_rad.sin()
-        );
+        // Calculate entry position based on geometry type  
+        let entry_pos = Self::calculate_entry_position(entry, route_geom);
         
         // Very permissive distance check - only prevent spawning if cars are extremely close
         let min_spawn_distance = 2.0; // Only 2 meters - allows spawning in tight traffic
@@ -193,18 +179,12 @@ impl TrafficManager {
         let behavior_state = self.behavior_engine.create_behavior_state(&behavior_name);
         
         let route_geom = &self.route.route.geometry;
-        let center = Point2::new(route_geom.center_x, route_geom.center_y);
         
-        // Calculate spawn position
-        let angle_rad = entry.angle.to_radians();
-        let radius = Self::get_lane_radius_static(entry.lane, route_geom);
-        let position = center + Vector2::new(
-            radius * angle_rad.cos(),
-            radius * angle_rad.sin()
-        );
+        // Calculate spawn position based on geometry type
+        let position = Self::calculate_entry_position(entry, route_geom);
         
-        // Calculate initial velocity (tangent to circle) with adaptive speed
-        let tangent_angle = angle_rad + std::f32::consts::PI / 2.0;
+        // Calculate initial velocity based on geometry type
+        let (initial_velocity, heading) = Self::calculate_entry_velocity(entry, route_geom, &position);
         
         // Adaptive speed based on nearby traffic conditions
         let mut initial_speed = 26.8; // 60 mph in m/s (60 / 2.237 = 26.8) - default speed
@@ -227,18 +207,14 @@ impl TrafficManager {
             log::debug!("Adaptive spawn speed: {:.1} m/s based on {} nearby cars", initial_speed, nearby_speeds.len());
         }
         
-        let velocity = Vector2::new(
-            -tangent_angle.sin() * initial_speed,
-            tangent_angle.cos() * initial_speed
-        );
-        
-        let initial_speed = initial_speed;
+        // Scale initial velocity by adaptive speed
+        let velocity = initial_velocity.normalize() * initial_speed;
         let car = Car {
             id: CarId(self.next_car_id),
             position,
             velocity,
             acceleration: Vector2::zeros(),
-            heading: tangent_angle,
+            heading,
             length: car_type.length,
             width: car_type.width,
             max_acceleration: car_type.max_acceleration,
@@ -295,18 +271,12 @@ impl TrafficManager {
         let behavior_state = self.behavior_engine.create_behavior_state(behavior_name);
         
         let route_geom = &self.route.route.geometry;
-        let center = Point2::new(route_geom.center_x, route_geom.center_y);
         
-        // Calculate spawn position
-        let angle_rad = entry.angle.to_radians();
-        let radius = Self::get_lane_radius_static(entry.lane, route_geom);
-        let position = center + Vector2::new(
-            radius * angle_rad.cos(),
-            radius * angle_rad.sin()
-        );
+        // Calculate spawn position based on geometry type
+        let position = Self::calculate_entry_position(&entry, route_geom);
         
-        // Calculate initial velocity (tangent to circle) with adaptive speed for manual spawning
-        let tangent_angle = angle_rad + std::f32::consts::PI / 2.0;
+        // Calculate initial velocity based on geometry type  
+        let (initial_velocity, heading) = Self::calculate_entry_velocity(&entry, route_geom, &position);
         
         // For manual spawning, be more conservative with speed matching to ensure safety
         let mut initial_speed = 20.0; // Slightly slower default for manual spawning
@@ -329,17 +299,15 @@ impl TrafficManager {
             log::debug!("Manual spawn speed: {:.1} m/s based on {} nearby cars (conservative)", initial_speed, nearby_speeds.len());
         }
         
-        let velocity = Vector2::new(
-            -tangent_angle.sin() * initial_speed,
-            tangent_angle.cos() * initial_speed
-        );
+        // Scale initial velocity by conservative speed
+        let velocity = initial_velocity.normalize() * initial_speed;
         
         let car = Car {
             id: CarId(self.next_car_id),
             position,
             velocity,
             acceleration: Vector2::zeros(),
-            heading: tangent_angle,
+            heading,
             length: car_type.length,
             width: car_type.width,
             max_acceleration: car_type.max_acceleration,
@@ -419,6 +387,108 @@ impl TrafficManager {
         }
         
         false
+    }
+    
+    fn calculate_entry_position(entry: &crate::config::EntryPoint, route_geom: &crate::config::RouteGeometry) -> Point2<f32> {
+        match route_geom.geometry_type.as_str() {
+            "cloverleaf" => Self::calculate_cloverleaf_entry_position(entry, route_geom),
+            "donut" => Self::calculate_donut_entry_position(entry, route_geom),
+            _ => {
+                log::warn!("Unknown geometry type '{}', using donut spawn logic", route_geom.geometry_type);
+                Self::calculate_donut_entry_position(entry, route_geom)
+            }
+        }
+    }
+    
+    fn calculate_donut_entry_position(entry: &crate::config::EntryPoint, route_geom: &crate::config::RouteGeometry) -> Point2<f32> {
+        let center = Point2::new(route_geom.center_x, route_geom.center_y);
+        let angle_rad = entry.angle.to_radians();
+        let radius = Self::get_lane_radius_static(entry.lane, route_geom);
+        center + Vector2::new(
+            radius * angle_rad.cos(),
+            radius * angle_rad.sin()
+        )
+    }
+    
+    fn calculate_cloverleaf_entry_position(entry: &crate::config::EntryPoint, route_geom: &crate::config::RouteGeometry) -> Point2<f32> {
+        // For cloverleaf, position cars based on lane numbers and highway layout
+        // Lane assignments:
+        // Lanes 1-3:  North-South Southbound (top to bottom) - spawn at north edge
+        // Lanes 4-6:  North-South Northbound (bottom to top) - spawn at south edge
+        // Lanes 7-9:  East-West Westbound (right to left) - spawn at east edge  
+        // Lanes 10-12: East-West Eastbound (left to right) - spawn at west edge
+        
+        let highway_extent = 250.0; // How far from center to spawn
+        let lane_width = route_geom.lane_width;
+        
+        match entry.lane {
+            // North-South Southbound (lanes 1-3) - spawn at north edge
+            1..=3 => {
+                let lane_offset = ((entry.lane as i32) - 2) as f32 * lane_width; // -3.5, 0, 3.5
+                Point2::new(lane_offset, highway_extent) // North edge
+            }
+            // North-South Northbound (lanes 4-6) - spawn at south edge
+            4..=6 => {
+                let lane_offset = (5 - (entry.lane as i32)) as f32 * lane_width; // 3.5, 0, -3.5
+                Point2::new(lane_offset, -highway_extent) // South edge
+            }
+            // East-West Westbound (lanes 7-9) - spawn at east edge
+            7..=9 => {
+                let lane_offset = (8 - (entry.lane as i32)) as f32 * lane_width; // 3.5, 0, -3.5
+                Point2::new(highway_extent, lane_offset) // East edge
+            }
+            // East-West Eastbound (lanes 10-12) - spawn at west edge
+            10..=12 => {
+                let lane_offset = ((entry.lane as i32) - 11) as f32 * lane_width; // -3.5, 0, 3.5
+                Point2::new(-highway_extent, lane_offset) // West edge
+            }
+            // Invalid lane - spawn at center
+            _ => {
+                log::warn!("Invalid lane {} for cloverleaf, spawning at center", entry.lane);
+                Point2::new(0.0, 0.0)
+            }
+        }
+    }
+    
+    fn calculate_entry_velocity(entry: &crate::config::EntryPoint, route_geom: &crate::config::RouteGeometry, _position: &Point2<f32>) -> (Vector2<f32>, f32) {
+        match route_geom.geometry_type.as_str() {
+            "cloverleaf" => Self::calculate_cloverleaf_entry_velocity(entry),
+            "donut" => Self::calculate_donut_entry_velocity(entry),
+            _ => {
+                log::warn!("Unknown geometry type '{}', using donut velocity logic", route_geom.geometry_type);
+                Self::calculate_donut_entry_velocity(entry)
+            }
+        }
+    }
+    
+    fn calculate_donut_entry_velocity(entry: &crate::config::EntryPoint) -> (Vector2<f32>, f32) {
+        // For donut, calculate tangent velocity (circular motion)
+        let angle_rad = entry.angle.to_radians();
+        let tangent_angle = angle_rad + std::f32::consts::PI / 2.0;
+        let velocity = Vector2::new(
+            -tangent_angle.sin(),
+            tangent_angle.cos()
+        );
+        (velocity, tangent_angle)
+    }
+    
+    fn calculate_cloverleaf_entry_velocity(entry: &crate::config::EntryPoint) -> (Vector2<f32>, f32) {
+        // For cloverleaf, calculate velocity based on lane assignments
+        match entry.lane {
+            // North-South Southbound (lanes 1-3) - heading south  
+            1..=3 => (Vector2::new(0.0, -1.0), -std::f32::consts::PI / 2.0),
+            // North-South Northbound (lanes 4-6) - heading north
+            4..=6 => (Vector2::new(0.0, 1.0), std::f32::consts::PI / 2.0),
+            // East-West Westbound (lanes 7-9) - heading west
+            7..=9 => (Vector2::new(-1.0, 0.0), std::f32::consts::PI),
+            // East-West Eastbound (lanes 10-12) - heading east
+            10..=12 => (Vector2::new(1.0, 0.0), 0.0),
+            // Invalid lane - default east
+            _ => {
+                log::warn!("Invalid lane {} for cloverleaf velocity, defaulting to east", entry.lane);
+                (Vector2::new(1.0, 0.0), 0.0)
+            }
+        }
     }
     
     

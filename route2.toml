@@ -40,7 +40,7 @@ merge_distance = 0.0      # no merge needed for through traffic
 id = "ns_south_entry_middle"
 type = "through"
 angle = 270.0
-position = "highway_edge" 
+position = "highway_edge"
 lane = 2                  # middle lane
 merge_distance = 0.0
 
@@ -56,7 +56,7 @@ merge_distance = 0.0
 [[route.entries]]
 id = "ns_north_entry"
 type = "through"
-angle = 90.0              # entering from south, heading north  
+angle = 90.0              # entering from south, heading north
 position = "highway_edge"
 lane = 4                  # rightmost northbound lane
 merge_distance = 0.0
@@ -83,12 +83,12 @@ id = "ew_west_entry"
 type = "through"
 angle = 180.0             # entering from east, heading west
 position = "highway_edge"
-lane = 7                  # rightmost westbound lane  
+lane = 7                  # rightmost westbound lane
 merge_distance = 0.0
 
 [[route.entries]]
 id = "ew_west_entry_middle"
-type = "through" 
+type = "through"
 angle = 180.0
 position = "highway_edge"
 lane = 8                  # middle westbound lane
@@ -116,7 +116,7 @@ id = "ew_east_entry_middle"
 type = "through"
 angle = 0.0
 position = "highway_edge"
-lane = 11                 # middle eastbound lane 
+lane = 11                 # middle eastbound lane
 merge_distance = 0.0
 
 [[route.entries]]
@@ -142,7 +142,7 @@ lane = 12                 # merges into eastbound left lane
 merge_distance = 100.0    # meters to complete merge
 loop_entry_angle = 270.0  # where cars enter the loop from southbound
 
-# Southeast Loop: For EW-Eastbound traffic turning left to NS-Northbound  
+# Southeast Loop: For EW-Eastbound traffic turning left to NS-Northbound
 [[route.entries]]
 id = "se_loop_entry"
 type = "loop_ramp"
@@ -154,7 +154,7 @@ loop_entry_angle = 0.0    # where cars enter the loop from eastbound
 
 # Southwest Loop: For NS-Northbound traffic turning left to EW-Westbound
 [[route.entries]]
-id = "sw_loop_entry"  
+id = "sw_loop_entry"
 type = "loop_ramp"
 angle = 135.0             # entry point of loop (southeast of center)
 position = "loop_merge"
@@ -190,7 +190,7 @@ exit_distance = 0.0
 id = "ns_south_exit_middle"
 type = "through"
 angle = 270.0
-position = "highway_edge" 
+position = "highway_edge"
 lane = 2                  # from middle southbound lane
 exit_distance = 0.0
 
@@ -285,7 +285,7 @@ exit_distance = 0.0
 id = "ne_loop_exit"
 type = "loop_ramp"
 angle = 315.0             # exit point from highway
-position = "loop_exit" 
+position = "loop_exit"
 lane = 3                  # exit from southbound left lane
 exit_distance = 50.0      # meters of deceleration
 loop_exit_angle = 270.0   # direction leaving the highway
@@ -296,7 +296,7 @@ id = "se_loop_exit"
 type = "loop_ramp"
 angle = 45.0              # exit point from highway
 position = "loop_exit"
-lane = 12                 # exit from eastbound left lane  
+lane = 12                 # exit from eastbound left lane
 exit_distance = 50.0
 loop_exit_angle = 0.0     # direction leaving the highway
 
@@ -312,7 +312,7 @@ loop_exit_angle = 90.0    # direction leaving the highway
 
 # Northwest Loop Exit: EW-Westbound traffic exiting to turn left (to NS-South)
 [[route.exits]]
-id = "nw_loop_exit"  
+id = "nw_loop_exit"
 type = "loop_ramp"
 angle = 225.0             # exit point from highway
 position = "loop_exit"
@@ -326,7 +326,7 @@ loop_exit_angle = 180.0   # direction leaving the highway
 
 [route.traffic_rules]
 speed_limit = 30.6        # m/s (110 km/h, ~68 mph) - highway speed
-min_speed = 22.2          # m/s (80 km/h, ~50 mph)  
+min_speed = 22.2          # m/s (80 km/h, ~50 mph)
 following_distance = 1.5  # seconds - highway following distance
 lane_change_time = 3.0    # seconds - time for lane changes
 
