@@ -125,6 +125,7 @@ impl PhysicsEngine {
         
         // Calculate velocity (tangential + radial components)
         let tangential_speed = target_speed;
+        // For counter-clockwise motion around the circle
         let tangent_dir = Vector2::new(-tangent_angle.sin(), tangent_angle.cos());
         
         // Add radial component for lane changes
@@ -138,8 +139,15 @@ impl PhysicsEngine {
         
         let new_velocity = tangent_dir * tangential_speed + radial_component;
         
-        // Update position by integrating velocity
-        let new_position = car.position + new_velocity * dt;
+        // Update position using angular motion for circular path
+        let center = Point2::new(route_geom.center_x, route_geom.center_y);
+        
+        // Calculate angular velocity from tangential speed
+        let angular_velocity = tangential_speed / target_radius;
+        let new_angle = current_angle + angular_velocity * dt;
+        
+        // Calculate new position on the circle
+        let new_position = center + target_radius * Vector2::new(new_angle.cos(), new_angle.sin());
         
         // Calculate acceleration vector
         let acceleration = if dt > 0.0 {

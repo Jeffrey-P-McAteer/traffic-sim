@@ -71,7 +71,9 @@ struct Application {
 impl Application {
     async fn new(args: &Args, event_loop: Option<&EventLoop<()>>) -> Result<Self> {
         // Initialize logging
-        env_logger::init();
+        env_logger::Builder::from_default_env()
+            .filter_level(if args.verbose { log::LevelFilter::Debug } else { log::LevelFilter::Info })
+            .init();
         info!("Starting Traffic Simulator");
         
         // Load configuration
@@ -419,7 +421,6 @@ async fn run_console_mode(args: Args) -> Result<()> {
     let start_time = Instant::now();
     let mut last_status = Instant::now();
     let mut frame_count = 0;
-    
     loop {
         app.performance_tracker.start_frame();
         
@@ -460,6 +461,9 @@ async fn run_console_mode(args: Args) -> Result<()> {
         }
         
         app.update_frame_timing();
+        
+        // Frame rate limiting for console mode (target 60 FPS)
+        std::thread::sleep(std::time::Duration::from_millis(16));
         
         // Run for 30 seconds
         if start_time.elapsed().as_secs() > 30 {
