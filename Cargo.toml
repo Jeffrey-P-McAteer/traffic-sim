@@ -14,6 +14,11 @@ vello = "0.2"
 kurbo = "0.11"        # 2D curves and shapes (used by Vello)
 bytemuck = { version = "1.14", features = ["derive"] }
 
+# GUI framework with text rendering
+egui = "0.28"
+egui-wgpu = "0.28"
+egui-winit = "0.28"
+
 # OpenCL for GPU compute acceleration
 opencl3 = "0.10"
 ocl = "0.19"

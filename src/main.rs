@@ -34,10 +34,6 @@ struct Args {
     #[arg(short, long)]
     seed: Option<u64>,
     
-    /// Run in console mode (no graphics)
-    #[arg(long)]
-    console: bool,
-    
     /// Enable verbose logging for detailed simulation progress
     #[arg(short, long)]
     verbose: bool,
@@ -52,7 +48,7 @@ enum Backend {
 }
 
 struct Application {
-    graphics: Option<GraphicsSystem>,
+    graphics: GraphicsSystem,
     simulation_state: SimulationState,
     compute_backend: ComputeBackend,
     performance_tracker: PerformanceTracker,
@@ -60,7 +56,6 @@ struct Application {
     last_frame_time: Instant,
     target_fps: f32,
     simulation_speed: f32,
-    console_mode: bool,
     verbose: bool,
     route_file: String,
     cars_file: String,
@@ -100,18 +95,14 @@ impl Application {
                   config.cars.simulation.spawn_rate);
         }
         
-        // Initialize graphics system (if not console mode)
-        let graphics = if args.console {
-            None
-        } else {
-            match event_loop {
-                Some(event_loop) => {
-                    let graphics = GraphicsSystem::new(event_loop).await?;
-                    info!("Graphics system initialized");
-                    Some(graphics)
-                }
-                None => return Err(anyhow::anyhow!("Event loop required for graphics mode")),
+        // Initialize graphics system
+        let graphics = match event_loop {
+            Some(event_loop) => {
+                let graphics = GraphicsSystem::new(event_loop).await?;
+                info!("Graphics system initialized");
+                graphics
             }
+            None => return Err(anyhow::anyhow!("Event loop required for GUI application")),
         };
         
         // Initialize simulation state
@@ -164,7 +155,7 @@ impl Application {
         
         // Display startup information
         info!("=== Simulation Configuration ===");
-        info!("Graphics: {}", if args.console { "Console mode" } else { "GPU accelerated (wgpu)" });
+        info!("Graphics: GPU accelerated (wgpu)");
         info!("Compute: {}", compute_backend.get_name());
         info!("Route: {} ({})", config.route.route.name, config.route.route.description);
         info!("Max Cars: {}", config.cars.simulation.total_cars);
@@ -187,7 +178,6 @@ impl Application {
             last_frame_time: Instant::now(),
             target_fps: 60.0,
             simulation_speed: 1.0,
-            console_mode: args.console,
             verbose: args.verbose,
             route_file: args.route.clone(),
             cars_file: args.cars.clone(),
@@ -234,41 +224,37 @@ impl Application {
     }
     
     fn render(&mut self) -> Result<()> {
-        if let Some(ref mut graphics) = self.graphics {
-            self.performance_tracker.start_render();
-            
-            // Create performance metrics
-            let performance_metrics = traffic_sim::simulation::PerformanceMetrics {
-                frame_time: self.performance_tracker.average_frame_time(),
-                simulation_time: self.performance_tracker.average_simulation_time(),
-                render_time: std::time::Duration::ZERO, // Will be updated by tracker
-                cpu_utilization: 0.0,
-                gpu_utilization: 0.0,
-                memory_usage: 0,
-            };
-            
-            graphics.render(
-                &self.simulation_state, 
-                &performance_metrics,
-                self.paused,
-                self.simulation_speed,
-                self.frame_count,
-                &self.route_file,
-                &self.cars_file
-            )?;
-            
-            self.performance_tracker.end_render();
-        }
+        self.performance_tracker.start_render();
+        
+        // Create performance metrics
+        let performance_metrics = traffic_sim::simulation::PerformanceMetrics {
+            frame_time: self.performance_tracker.average_frame_time(),
+            simulation_time: self.performance_tracker.average_simulation_time(),
+            render_time: std::time::Duration::ZERO, // Will be updated by tracker
+            cpu_utilization: 0.0,
+            gpu_utilization: 0.0,
+            memory_usage: 0,
+        };
+        
+        self.graphics.render(
+            &self.simulation_state, 
+            &performance_metrics,
+            self.paused,
+            self.simulation_speed,
+            self.frame_count,
+            &self.route_file,
+            &self.cars_file
+        )?;
+        
+        self.performance_tracker.end_render();
         
         Ok(())
     }
     
     fn handle_input(&mut self, event: &WindowEvent) -> bool {
-        // Handle graphics input first (if graphics enabled)
-        if let Some(ref mut graphics) = self.graphics {
-            if graphics.handle_input(event) {
-                return true;
-            }
+        // Handle graphics input first
+        if self.graphics.handle_input(event) {
+            return true;
         }
         
         // Handle application-specific input
@@ -349,7 +335,7 @@ impl Application {
     }
 }
 
-async fn run_graphics_mode(args: Args) -> Result<()> {
+async fn run_simulation(args: Args) -> Result<()> {
     let event_loop = EventLoop::new()?;
     let mut app = Application::new(&args, Some(&event_loop)).await?;
     
@@ -363,31 +349,29 @@ async fn run_graphics_mode(args: Args) -> Result<()> {
                 ref event,
                 window_id,
             } => {
-                if let Some(ref graphics) = app.graphics {
-                    if window_id == graphics.window.id() {
-                        if !app.handle_input(event) {
-                            match event {
-                                WindowEvent::CloseRequested => {
-                                    info!("Close requested");
-                                    control_flow.exit();
-                                }
-                                WindowEvent::RedrawRequested => {
-                                    if let Err(e) = app.update() {
-                                        log::error!("Update error: {}", e);
-                                    }
-                                    
-                                    if let Err(e) = app.render() {
-                                        log::error!("Render error: {}", e);
-                                    }
-                                }
-                                WindowEvent::Resized(_physical_size) => {
-                                    // Handled in graphics system
-                                }
-                                WindowEvent::ScaleFactorChanged { .. } => {
-                                    // Handled in graphics system
-                                }
-                                _ => {}
+                if window_id == app.graphics.window.id() {
+                    if !app.handle_input(event) {
+                        match event {
+                            WindowEvent::CloseRequested => {
+                                info!("Close requested");
+                                control_flow.exit();
                             }
+                            WindowEvent::RedrawRequested => {
+                                if let Err(e) = app.update() {
+                                    log::error!("Update error: {}", e);
+                                }
+                                
+                                if let Err(e) = app.render() {
+                                    log::error!("Render error: {}", e);
+                                }
+                            }
+                            WindowEvent::Resized(_physical_size) => {
+                                // Handled in graphics system
+                            }
+                            WindowEvent::ScaleFactorChanged { .. } => {
+                                // Handled in graphics system
+                            }
+                            _ => {}
                         }
                     }
                 }
@@ -399,9 +383,7 @@ async fn run_graphics_mode(args: Args) -> Result<()> {
             }
             Event::AboutToWait => {
                 // Request redraw
-                if let Some(ref graphics) = app.graphics {
-                    graphics.window.request_redraw();
-                }
+                app.graphics.window.request_redraw();
                 app.update_frame_timing();
             }
             _ => {}
@@ -412,86 +394,11 @@ async fn run_graphics_mode(args: Args) -> Result<()> {
     Ok(())
 }
 
-async fn run_console_mode(args: Args) -> Result<()> {
-    let mut app = Application::new(&args, None).await?;
-    
-    info!("Starting console mode...");
-    info!("Running simulation for 30 seconds (press Ctrl+C to stop)...");
-    
-    let start_time = Instant::now();
-    let mut last_status = Instant::now();
-    let mut frame_count = 0;
-    loop {
-        app.performance_tracker.start_frame();
-        
-        if let Err(e) = app.update() {
-            log::error!("Update error: {}", e);
-            break;
-        }
-        
-        frame_count += 1;
-        app.performance_tracker.end_frame();
-        
-        // Print status every second
-        if last_status.elapsed().as_secs() >= 1 {
-            let elapsed = start_time.elapsed();
-            let fps = app.performance_tracker.fps();
-            if app.verbose {
-                info!("Frame {}: {} cars active, {} total spawned, {:.1} FPS, Sim time: {:.1}s, Elapsed: {:.1}s", 
-                      frame_count,
-                      app.simulation_state.active_cars,
-                      app.simulation_state.total_spawned,
-                      fps,
-                      app.simulation_state.time,
-                      elapsed.as_secs_f32()
-                );
-                info!("  Performance: Sim {:.2}ms/frame, Frame {:.2}ms total",
-                      app.performance_tracker.average_simulation_time().as_secs_f32() * 1000.0,
-                      app.performance_tracker.average_frame_time().as_secs_f32() * 1000.0
-                );
-            } else {
-                info!("Frame {}: {} cars active, {:.1} FPS, Elapsed: {:.1}s", 
-                      frame_count,
-                      app.simulation_state.active_cars,
-                      fps,
-                      elapsed.as_secs_f32()
-                );
-            }
-            last_status = Instant::now();
-        }
-        
-        app.update_frame_timing();
-        
-        // Frame rate limiting for console mode (target 60 FPS)
-        std::thread::sleep(std::time::Duration::from_millis(16));
-        
-        // Run for 30 seconds
-        if start_time.elapsed().as_secs() > 30 {
-            break;
-        }
-    }
-    
-    let total_time = start_time.elapsed();
-    info!("Simulation completed!");
-    info!("Total time: {:.2}s, Frames: {}, Avg FPS: {:.1}", 
-          total_time.as_secs_f32(), 
-          frame_count,
-          frame_count as f32 / total_time.as_secs_f32());
-    info!("Final: {} cars active, {} total spawned", 
-          app.simulation_state.active_cars, 
-          app.simulation_state.total_spawned);
-    
-    Ok(())
-}
 
 fn main() -> Result<()> {
     let args = Args::parse();
     
     pollster::block_on(async {
-        if args.console {
-            run_console_mode(args).await
-        } else {
-            run_graphics_mode(args).await
-        }
+        run_simulation(args).await
     })
 }

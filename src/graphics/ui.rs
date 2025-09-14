@@ -3,8 +3,7 @@ use crate::graphics::Viewport;
 use anyhow::Result;
 
 pub struct UiRenderer {
-    // For now, we'll use a simple text-based overlay
-    // In a full implementation, you might use egui or similar
+    // egui handles its own state, so we don't need much here
 }
 
 impl UiRenderer {
@@ -12,67 +11,94 @@ impl UiRenderer {
         Ok(Self {})
     }
     
-    pub fn render(
-        &mut self, 
-        performance: &PerformanceMetrics, 
+    pub fn render_egui(
+        &mut self,
+        ctx: &egui::Context,
+        performance: &PerformanceMetrics,
         state: &SimulationState,
         viewport: &Viewport,
         paused: bool,
         simulation_speed: f32,
         frame_count: u64,
         route_file: &str,
-        cars_file: &str
-    ) -> Result<()> {
-        // For now, we'll just log the performance metrics
-        // In a full implementation, you would render this as overlay text
-        
+        cars_file: &str,
+    ) {
         let fps = if !performance.frame_time.is_zero() {
             1.0 / performance.frame_time.as_secs_f32()
         } else {
             0.0
         };
         
-        // Create text overlays for GUI rendering in lower-left corner
         let status = if paused { "PAUSED" } else { "RUNNING" };
         
-        let overlays = vec![
-            // Status section
-            TextOverlay::new(format!("Status: {}", status), 15.0, 15.0),
-            TextOverlay::new(format!("Cars: {}/{}", state.active_cars, state.total_spawned), 15.0, 35.0),
-            TextOverlay::new(format!("Time: {:.1}s", state.time), 15.0, 55.0),
-            TextOverlay::new(format!("Speed: {:.2}x", simulation_speed), 15.0, 75.0),
-            TextOverlay::new(format!("FPS: {:.0}", fps), 15.0, 95.0),
-            TextOverlay::new(format!("Frame: {}", frame_count), 15.0, 115.0),
-            
-            // Files section
-            TextOverlay::new(format!("Route: {}", route_file), 15.0, 145.0),
-            TextOverlay::new(format!("Cars: {}", cars_file), 15.0, 165.0),
-            
-            // Camera info
-            TextOverlay::new(format!("Zoom: {:.2}x", viewport.get_zoom()), 15.0, 195.0),
-            TextOverlay::new(format!("Pos: ({:.0}, {:.0})", 
-                           viewport.get_position().x, viewport.get_position().y), 15.0, 215.0),
-            
-            // Controls help
-            TextOverlay::new("=== CONTROLS ===".to_string(), 15.0, 245.0),
-            TextOverlay::new("Mouse: Drag=pan, Wheel=zoom".to_string(), 15.0, 265.0),
-            TextOverlay::new("WASD/Arrows: Move camera".to_string(), 15.0, 285.0),
-            TextOverlay::new("Home: Reset view".to_string(), 15.0, 305.0),
-            TextOverlay::new("Space: Pause/Resume".to_string(), 15.0, 325.0),
-            TextOverlay::new("1-5: Speed (0.25x-4x)".to_string(), 15.0, 345.0),
-            TextOverlay::new("R: Reset simulation".to_string(), 15.0, 365.0),
-            TextOverlay::new("ESC: Exit".to_string(), 15.0, 385.0),
-        ];
+        // Status overlay in the lower-left corner
+        egui::Area::new(egui::Id::new("status_overlay"))
+            .fixed_pos(egui::pos2(15.0, 15.0))
+            .show(ctx, |ui| {
+                ui.with_layout(egui::Layout::top_down(egui::Align::LEFT), |ui| {
+                    // Semi-transparent background
+                    let rect = ui.available_rect_before_wrap();
+                    ui.painter().rect_filled(
+                        rect.expand(5.0),
+                        5.0,
+                        egui::Color32::from_black_alpha(160)
+                    );
+                    
+                    ui.spacing_mut().item_spacing = egui::vec2(0.0, 2.0);
+                    ui.style_mut().override_text_style = Some(egui::TextStyle::Monospace);
+                    
+                    // Status section
+                    ui.colored_label(
+                        if paused { egui::Color32::YELLOW } else { egui::Color32::GREEN },
+                        format!("Status: {}", status)
+                    );
+                    ui.label(format!("Cars: {}/{}", state.active_cars, state.total_spawned));
+                    ui.label(format!("Time: {:.1}s", state.time));
+                    ui.label(format!("Speed: {:.2}x", simulation_speed));
+                    ui.label(format!("FPS: {:.0}", fps));
+                    ui.label(format!("Frame: {}", frame_count));
+                    
+                    ui.add_space(10.0);
+                    
+                    // Files section
+                    ui.label(format!("Route: {}", route_file));
+                    ui.label(format!("Cars: {}", cars_file));
+                    
+                    ui.add_space(10.0);
+                    
+                    // Camera info
+                    ui.label(format!("Zoom: {:.2}x", viewport.get_zoom()));
+                    ui.label(format!("Pos: ({:.0}, {:.0})", 
+                               viewport.get_position().x, viewport.get_position().y));
+                });
+            });
         
-        // In a full implementation with actual text rendering:
-        // - These overlays would be rendered as text on top of the 3D scene
-        // - For now, we silently collect them and log debug info
-        
-        log::debug!("UI Overlays: {} text elements ready for rendering", overlays.len());
-        log::debug!("Performance: FPS={:.1}, Frame={:.2}ms, Sim={:.2}ms", 
-                   fps, performance.frame_time.as_millis(), performance.simulation_time.as_millis());
-        
-        Ok(())
+        // Controls help in the lower-left corner
+        egui::Area::new(egui::Id::new("controls_overlay"))
+            .fixed_pos(egui::pos2(15.0, 350.0))
+            .show(ctx, |ui| {
+                ui.with_layout(egui::Layout::top_down(egui::Align::LEFT), |ui| {
+                    // Semi-transparent background
+                    let rect = ui.available_rect_before_wrap();
+                    ui.painter().rect_filled(
+                        rect.expand(5.0),
+                        5.0,
+                        egui::Color32::from_black_alpha(160)
+                    );
+                    
+                    ui.spacing_mut().item_spacing = egui::vec2(0.0, 2.0);
+                    ui.style_mut().override_text_style = Some(egui::TextStyle::Small);
+                    
+                    ui.colored_label(egui::Color32::WHITE, "=== CONTROLS ===");
+                    ui.label("Mouse: Drag=pan, Wheel=zoom");
+                    ui.label("WASD/Arrows: Move camera");
+                    ui.label("Home: Reset view");
+                    ui.label("Space: Pause/Resume");
+                    ui.label("1-5: Speed (0.25x-4x)");
+                    ui.label("R: Reset simulation");
+                    ui.label("ESC: Exit");
+                });
+            });
     }
 }
 

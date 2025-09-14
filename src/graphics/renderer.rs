@@ -163,6 +163,22 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 "#;
 
 impl TrafficRenderer {
+    pub fn device(&self) -> &wgpu::Device {
+        &self.device
+    }
+    
+    pub fn queue(&self) -> &wgpu::Queue {
+        &self.queue
+    }
+    
+    pub fn config(&self) -> &wgpu::SurfaceConfiguration {
+        &self.config
+    }
+    
+    pub fn surface(&self) -> &wgpu::Surface<'_> {
+        &self.surface
+    }
+
     pub async fn new(window: std::sync::Arc<Window>) -> Result<Self> {
         let size = window.inner_size();
         
@@ -367,6 +383,74 @@ impl TrafficRenderer {
         }
     }
     
+    pub fn render_to_texture(
+        &mut self, 
+        state: &SimulationState, 
+        view_matrix: &Matrix4<f32>,
+        target_view: &wgpu::TextureView,
+        encoder: &mut wgpu::CommandEncoder
+    ) -> Result<()> {
+        // Update view uniforms
+        let view_proj_array: [[f32; 4]; 4] = (*view_matrix).into();
+        let uniforms = ViewUniforms {
+            view_proj: view_proj_array,
+        };
+        self.queue.write_buffer(&self.view_buffer, 0, bytemuck::cast_slice(&[uniforms]));
+        
+        // Update car instances
+        let car_instances: Vec<CarInstance> = state.cars.iter().map(|car| {
+            self.create_car_instance(car)
+        }).collect();
+        
+        if !car_instances.is_empty() {
+            self.queue.write_buffer(
+                &self.car_instance_buffer,
+                0,
+                bytemuck::cast_slice(&car_instances),
+            );
+        }
+        
+        // Begin render pass
+        {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Traffic Render Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: target_view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            r: 0.1,
+                            g: 0.2,
+                            b: 0.3,
+                            a: 1.0,
+                        }),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                occlusion_query_set: None,
+                timestamp_writes: None,
+            });
+            
+            render_pass.set_pipeline(&self.render_pipeline);
+            render_pass.set_bind_group(0, &self.view_bind_group, &[]);
+            
+            // Render road
+            render_pass.set_vertex_buffer(0, self.road_vertex_buffer.slice(..));
+            render_pass.set_vertex_buffer(1, self.road_identity_instance_buffer.slice(..));
+            render_pass.draw(0..self.road_vertex_count, 0..1);
+            
+            // Render cars
+            if !state.cars.is_empty() {
+                render_pass.set_vertex_buffer(0, self.car_vertex_buffer.slice(..));
+                render_pass.set_vertex_buffer(1, self.car_instance_buffer.slice(..));
+                render_pass.draw(0..6, 0..state.cars.len() as u32);
+            }
+        }
+        
+        Ok(())
+    }
+
     pub fn render(&mut self, state: &SimulationState, view_matrix: &Matrix4<f32>) -> Result<()> {
         // Update view uniforms
         let view_proj_array: [[f32; 4]; 4] = (*view_matrix).into();
