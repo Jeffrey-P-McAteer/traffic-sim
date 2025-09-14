@@ -75,7 +75,16 @@ impl GraphicsSystem {
         }
     }
     
-    pub fn render(&mut self, state: &SimulationState, performance: &PerformanceMetrics) -> Result<()> {
+    pub fn render(
+        &mut self, 
+        state: &SimulationState, 
+        performance: &PerformanceMetrics,
+        paused: bool,
+        simulation_speed: f32,
+        frame_count: u64,
+        route_file: &str,
+        cars_file: &str
+    ) -> Result<()> {
         // Update viewport
         self.viewport.update();
         
@@ -84,7 +93,7 @@ impl GraphicsSystem {
         self.renderer.render(state, &view_matrix)?;
         
         // Render UI overlay
-        self.ui.render(performance, state, &self.viewport)?;
+        self.ui.render(performance, state, &self.viewport, paused, simulation_speed, frame_count, route_file, cars_file)?;
         
         Ok(())
     }

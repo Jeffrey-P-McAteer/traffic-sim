@@ -115,7 +115,7 @@ impl PhysicsEngine {
         }
         
         // Calculate position based on current and target radius
-        let lerp_radius = if car.target_lane.is_some() {
+        let _lerp_radius = if car.target_lane.is_some() {
             let current_target_radius = self.get_lane_radius(car.current_lane, route_geom);
             let target_target_radius = self.get_lane_radius(car.target_lane.unwrap(), route_geom);
             current_target_radius + (target_target_radius - current_target_radius) * lane_change_progress

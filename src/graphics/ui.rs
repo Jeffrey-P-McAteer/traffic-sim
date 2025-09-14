@@ -16,7 +16,12 @@ impl UiRenderer {
         &mut self, 
         performance: &PerformanceMetrics, 
         state: &SimulationState,
-        viewport: &Viewport
+        viewport: &Viewport,
+        paused: bool,
+        simulation_speed: f32,
+        frame_count: u64,
+        route_file: &str,
+        cars_file: &str
     ) -> Result<()> {
         // For now, we'll just log the performance metrics
         // In a full implementation, you would render this as overlay text
@@ -27,20 +32,37 @@ impl UiRenderer {
             0.0
         };
         
-        log::debug!("=== Performance Metrics ===");
-        log::debug!("FPS: {:.1}", fps);
-        log::debug!("Frame Time: {:.2}ms", performance.frame_time.as_millis());
-        log::debug!("Simulation Time: {:.2}ms", performance.simulation_time.as_millis());
-        log::debug!("Render Time: {:.2}ms", performance.render_time.as_millis());
+        // In a real UI implementation, this would render text overlays on the screen
+        // For now, we output to console with comprehensive status information
         
-        log::debug!("=== Simulation State ===");
-        log::debug!("Active Cars: {}", state.active_cars);
-        log::debug!("Total Spawned: {}", state.total_spawned);
-        log::debug!("Simulation Time: {:.1}s", state.time);
+        let status = if paused { "PAUSED" } else { "RUNNING" };
         
-        log::debug!("=== Viewport ===");
-        log::debug!("Position: ({:.1}, {:.1})", viewport.get_position().x, viewport.get_position().y);
-        log::debug!("Zoom: {:.2}x", viewport.get_zoom());
+        println!("\n╔═══════════════════════════════════════════════════════════════╗");
+        println!("║                    TRAFFIC SIMULATION STATUS                  ║");
+        println!("╠═══════════════════════════════════════════════════════════════╣");
+        println!("║ Status: {:8} │ Frame: {:10} │ Speed: {:6.2}x      ║", status, frame_count, simulation_speed);
+        println!("║ Cars:   {:3}/{:<8} │ Time:  {:10.1}s │ FPS:   {:6.1}      ║", 
+                 state.active_cars, state.total_spawned, state.time, fps);
+        println!("╠═══════════════════════════════════════════════════════════════╣");
+        println!("║ Route File: {:<49} ║", route_file);
+        println!("║ Cars File:  {:<49} ║", cars_file);
+        println!("╠═══════════════════════════════════════════════════════════════╣");
+        println!("║                       VIEWPORT CONTROLS                       ║");
+        println!("║ Current Position: ({:6.0}, {:6.0}) │ Zoom: {:6.2}x            ║", 
+                 viewport.get_position().x, viewport.get_position().y, viewport.get_zoom());
+        println!("║ Mouse Drag: Pan view        │ Mouse Wheel: Zoom in/out       ║");
+        println!("║ WASD/Arrow Keys: Move camera │ +/- Keys: Zoom in/out         ║");
+        println!("║ Home: Reset view to center  │                                ║");
+        println!("╠═══════════════════════════════════════════════════════════════╣");
+        println!("║                      SIMULATION CONTROLS                     ║");
+        println!("║ SPACE: Pause/Resume         │ R: Reset simulation            ║");
+        println!("║ 1-5: Set speed (0.25x-4x)  │ F1: Toggle performance display ║");
+        println!("║ ESC: Exit simulation        │                                ║");
+        println!("╚═══════════════════════════════════════════════════════════════╝");
+        
+        // Also log debug info for development
+        log::debug!("Performance: FPS={:.1}, Frame={:.2}ms, Sim={:.2}ms", 
+                   fps, performance.frame_time.as_millis(), performance.simulation_time.as_millis());
         
         Ok(())
     }
@@ -121,12 +143,16 @@ pub fn create_performance_overlay(
 // Control hints for the user
 pub fn create_control_hints() -> Vec<TextOverlay> {
     vec![
-        TextOverlay::new("=== CONTROLS ===".to_string(), 10.0, 250.0),
-        TextOverlay::new("Mouse: Drag to pan".to_string(), 10.0, 270.0),
-        TextOverlay::new("Wheel: Zoom in/out".to_string(), 10.0, 290.0),
-        TextOverlay::new("WASD/Arrows: Move camera".to_string(), 10.0, 310.0),
-        TextOverlay::new("Home: Reset view".to_string(), 10.0, 330.0),
-        TextOverlay::new("+/-: Zoom in/out".to_string(), 10.0, 350.0),
-        TextOverlay::new("Space: Pause/Resume".to_string(), 10.0, 370.0),
+        TextOverlay::new("=== VIEWPORT CONTROLS ===".to_string(), 10.0, 250.0),
+        TextOverlay::new("Mouse Drag: Pan view".to_string(), 10.0, 270.0),
+        TextOverlay::new("Mouse Wheel: Zoom in/out".to_string(), 10.0, 290.0),
+        TextOverlay::new("WASD/Arrow Keys: Move camera".to_string(), 10.0, 310.0),
+        TextOverlay::new("Home: Reset view to center".to_string(), 10.0, 330.0),
+        TextOverlay::new("+/- Keys: Zoom in/out".to_string(), 10.0, 350.0),
+        TextOverlay::new("=== SIMULATION CONTROLS ===".to_string(), 10.0, 380.0),
+        TextOverlay::new("Space: Pause/Resume".to_string(), 10.0, 400.0),
+        TextOverlay::new("R: Reset simulation".to_string(), 10.0, 420.0),
+        TextOverlay::new("1-5: Set speed (0.25x - 4x)".to_string(), 10.0, 440.0),
+        TextOverlay::new("ESC: Exit simulation".to_string(), 10.0, 460.0),
     ]
 }

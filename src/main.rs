@@ -62,6 +62,10 @@ struct Application {
     simulation_speed: f32,
     console_mode: bool,
     verbose: bool,
+    route_file: String,
+    cars_file: String,
+    frame_count: u64,
+    should_exit: bool,
 }
 
 impl Application {
@@ -183,6 +187,10 @@ impl Application {
             simulation_speed: 1.0,
             console_mode: args.console,
             verbose: args.verbose,
+            route_file: args.route.clone(),
+            cars_file: args.cars.clone(),
+            frame_count: 0,
+            should_exit: false,
         })
     }
     
@@ -217,6 +225,9 @@ impl Application {
             self.performance_tracker.end_simulation();
         }
         
+        // Increment frame counter
+        self.frame_count += 1;
+        
         Ok(())
     }
     
@@ -234,7 +245,15 @@ impl Application {
                 memory_usage: 0,
             };
             
-            graphics.render(&self.simulation_state, &performance_metrics)?;
+            graphics.render(
+                &self.simulation_state, 
+                &performance_metrics,
+                self.paused,
+                self.simulation_speed,
+                self.frame_count,
+                &self.route_file,
+                &self.cars_file
+            )?;
             
             self.performance_tracker.end_render();
         }
@@ -302,6 +321,11 @@ impl Application {
                         info!("Performance display toggled");
                         true
                     }
+                    winit::keyboard::KeyCode::Escape => {
+                        info!("ESC pressed - exiting simulation");
+                        self.should_exit = true;
+                        true
+                    }
                     _ => false
                 }
             }
@@ -364,6 +388,11 @@ async fn run_graphics_mode(args: Args) -> Result<()> {
                             }
                         }
                     }
+                }
+                
+                // Check for exit flag
+                if app.should_exit {
+                    control_flow.exit();
                 }
             }
             Event::AboutToWait => {
