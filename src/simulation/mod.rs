@@ -31,6 +31,7 @@ pub struct Car {
     pub target_lane: Option<u32>,
     pub lane_change_progress: f32,
     pub behavior: BehaviorState,
+    pub behavior_type: String,
     pub car_type: String,
 }
 

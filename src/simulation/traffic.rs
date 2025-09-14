@@ -190,6 +190,7 @@ impl TrafficManager {
             target_lane: None,
             lane_change_progress: 0.0,
             behavior: behavior_state,
+            behavior_type: behavior_name,
             car_type: car_type.id.clone(),
         };
         

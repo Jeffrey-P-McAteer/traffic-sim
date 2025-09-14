@@ -112,6 +112,37 @@ impl UiRenderer {
                     ui.label("ESC: Exit");
                 });
             });
+        
+        // Color legend in the lower-left corner
+        egui::Area::new(egui::Id::new("legend_overlay"))
+            .anchor(egui::Align2::LEFT_BOTTOM, egui::vec2(15.0, -15.0))
+            .show(ctx, |ui| {
+                ui.with_layout(egui::Layout::top_down(egui::Align::LEFT), |ui| {
+                    // Semi-transparent background
+                    let rect = ui.available_rect_before_wrap();
+                    ui.painter().rect_filled(
+                        rect.expand(5.0),
+                        5.0,
+                        egui::Color32::from_black_alpha(160)
+                    );
+                    
+                    ui.spacing_mut().item_spacing = egui::vec2(0.0, 2.0);
+                    ui.style_mut().override_text_style = Some(egui::TextStyle::Body);
+                    
+                    ui.colored_label(egui::Color32::WHITE, "=== CAR COLORS ===");
+                    ui.colored_label(egui::Color32::from_rgb(230, 50, 50), "● Aggressive (Red)");
+                    ui.colored_label(egui::Color32::from_rgb(50, 150, 230), "● Normal (Blue)");
+                    ui.colored_label(egui::Color32::from_rgb(50, 200, 50), "● Cautious (Green)");
+                    ui.colored_label(egui::Color32::from_rgb(230, 125, 25), "● Erratic (Orange)");
+                    ui.colored_label(egui::Color32::from_rgb(180, 50, 230), "● Strategic (Purple)");
+                    
+                    ui.add_space(10.0);
+                    
+                    ui.colored_label(egui::Color32::WHITE, "=== HIGHWAY SYMBOLS ===");
+                    ui.colored_label(egui::Color32::from_rgb(0, 200, 0), "▲ Entry Points");
+                    ui.colored_label(egui::Color32::from_rgb(200, 0, 0), "▲ Exit Points");
+                });
+            });
     }
 }
 

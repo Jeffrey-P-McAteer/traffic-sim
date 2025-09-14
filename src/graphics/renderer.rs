@@ -537,7 +537,7 @@ impl TrafficRenderer {
     }
     
     fn create_road_vertices() -> Vec<Vertex> {
-        // Create donut-shaped highway with lane markings
+        // Create donut-shaped highway with lane markings, entry/exit symbols
         let mut vertices = Vec::new();
         let segments = 64;
         let inner_radius = 150.0;
@@ -570,7 +570,7 @@ impl TrafficRenderer {
             vertices.push(Vertex { position: outer2, color: road_color });
         }
         
-        // Add lane markings (white dashed lines)
+        // Add lane markings (white dashed lines between lanes)
         let line_width = 0.15;
         let dash_length = 3.0; // meters
         let dash_spacing = 6.0; // meters
@@ -613,7 +613,110 @@ impl TrafficRenderer {
             }
         }
         
+        // Add solid white lines for lane boundaries
+        let solid_line_width = 0.2;
+        
+        // Inner boundary (solid white line)
+        Self::add_circular_line(&mut vertices, inner_radius, solid_line_width, white_color, 0.01, segments);
+        
+        // Outer boundary (solid white line)  
+        Self::add_circular_line(&mut vertices, outer_radius, solid_line_width, white_color, 0.01, segments);
+        
+        // Add entry points (green arrows/triangles at interior positions)
+        let entry_positions = [0.0, 180.0]; // degrees - entry_1 at 0°, entry_2 at 180°
+        let entry_color = [0.0, 0.8, 0.0]; // Bright green
+        
+        for &entry_angle in &entry_positions {
+            Self::add_entry_symbol(&mut vertices, entry_angle, inner_radius - 5.0, entry_color);
+        }
+        
+        // Add exit points (red arrows/triangles at exterior positions)  
+        let exit_positions = [90.0, 270.0]; // degrees - exit_1 at 90°, exit_2 at 270°
+        let exit_color = [0.8, 0.0, 0.0]; // Bright red
+        
+        for &exit_angle in &exit_positions {
+            Self::add_exit_symbol(&mut vertices, exit_angle, outer_radius + 5.0, exit_color);
+        }
+        
         vertices
+    }
+    
+    fn add_circular_line(vertices: &mut Vec<Vertex>, radius: f32, width: f32, color: [f32; 3], z: f32, segments: usize) {
+        for i in 0..segments {
+            let angle1 = (i as f32) * 2.0 * std::f32::consts::PI / (segments as f32);
+            let angle2 = ((i + 1) as f32) * 2.0 * std::f32::consts::PI / (segments as f32);
+            
+            let inner_r = radius - width * 0.5;
+            let outer_r = radius + width * 0.5;
+            
+            let inner1 = [inner_r * angle1.cos(), inner_r * angle1.sin(), z];
+            let inner2 = [inner_r * angle2.cos(), inner_r * angle2.sin(), z];
+            let outer1 = [outer_r * angle1.cos(), outer_r * angle1.sin(), z];
+            let outer2 = [outer_r * angle2.cos(), outer_r * angle2.sin(), z];
+            
+            // Two triangles for each segment
+            vertices.push(Vertex { position: inner1, color });
+            vertices.push(Vertex { position: outer1, color });
+            vertices.push(Vertex { position: inner2, color });
+            
+            vertices.push(Vertex { position: inner2, color });
+            vertices.push(Vertex { position: outer1, color });
+            vertices.push(Vertex { position: outer2, color });
+        }
+    }
+    
+    fn add_entry_symbol(vertices: &mut Vec<Vertex>, angle_deg: f32, radius: f32, color: [f32; 3]) {
+        let angle_rad = angle_deg.to_radians();
+        let center_x = radius * angle_rad.cos();
+        let center_y = radius * angle_rad.sin();
+        
+        // Create arrow pointing inward (toward the highway)
+        let size = 4.0;
+        let arrow_angle = angle_rad + std::f32::consts::PI; // Point inward
+        
+        // Arrow tip
+        let tip_x = center_x + size * arrow_angle.cos();
+        let tip_y = center_y + size * arrow_angle.sin();
+        
+        // Arrow base points
+        let base_angle1 = arrow_angle + 2.5;
+        let base_angle2 = arrow_angle - 2.5;
+        let base_x1 = center_x + (size * 0.6) * base_angle1.cos();
+        let base_y1 = center_y + (size * 0.6) * base_angle1.sin();
+        let base_x2 = center_x + (size * 0.6) * base_angle2.cos();
+        let base_y2 = center_y + (size * 0.6) * base_angle2.sin();
+        
+        // Create triangle for arrow
+        vertices.push(Vertex { position: [tip_x, tip_y, 0.02], color });
+        vertices.push(Vertex { position: [base_x1, base_y1, 0.02], color });
+        vertices.push(Vertex { position: [base_x2, base_y2, 0.02], color });
+    }
+    
+    fn add_exit_symbol(vertices: &mut Vec<Vertex>, angle_deg: f32, radius: f32, color: [f32; 3]) {
+        let angle_rad = angle_deg.to_radians();
+        let center_x = radius * angle_rad.cos();
+        let center_y = radius * angle_rad.sin();
+        
+        // Create arrow pointing outward (away from the highway)
+        let size = 4.0;
+        let arrow_angle = angle_rad; // Point outward
+        
+        // Arrow tip
+        let tip_x = center_x + size * arrow_angle.cos();
+        let tip_y = center_y + size * arrow_angle.sin();
+        
+        // Arrow base points
+        let base_angle1 = arrow_angle + 2.5;
+        let base_angle2 = arrow_angle - 2.5;
+        let base_x1 = center_x + (size * 0.6) * base_angle1.cos();
+        let base_y1 = center_y + (size * 0.6) * base_angle1.sin();
+        let base_x2 = center_x + (size * 0.6) * base_angle2.cos();
+        let base_y2 = center_y + (size * 0.6) * base_angle2.sin();
+        
+        // Create triangle for arrow
+        vertices.push(Vertex { position: [tip_x, tip_y, 0.02], color });
+        vertices.push(Vertex { position: [base_x1, base_y1, 0.02], color });
+        vertices.push(Vertex { position: [base_x2, base_y2, 0.02], color });
     }
     
     fn create_car_instance(&self, car: &Car) -> CarInstance {
@@ -625,14 +728,26 @@ impl TrafficRenderer {
         let transform = translation * rotation * scale;
         let transform_array: [[f32; 4]; 4] = transform.into();
         
-        // Color based on car type or speed
+        // Color based on driving behavior type
+        let base_color = match car.behavior_type.as_str() {
+            "aggressive" => [0.9, 0.2, 0.2],    // Red for aggressive drivers
+            "normal" => [0.2, 0.6, 0.9],        // Blue for normal drivers
+            "cautious" => [0.2, 0.8, 0.2],      // Green for cautious drivers
+            "erratic" => [0.9, 0.5, 0.1],       // Orange for erratic drivers
+            "strategic" => [0.7, 0.2, 0.9],     // Purple for strategic drivers
+            _ => [0.5, 0.5, 0.5],                // Gray for unknown behavior
+        };
+        
+        // Modulate color intensity based on speed for additional visual feedback
         let speed = car.velocity.magnitude();
-        let max_speed = 30.0; // Assume max speed for color scaling
+        let max_speed = 30.0;
         let speed_ratio = (speed / max_speed).min(1.0);
+        let brightness = 0.4 + speed_ratio * 0.6; // Brighter when moving faster
+        
         let color = [
-            0.2 + speed_ratio * 0.8, // Red increases with speed
-            0.8 - speed_ratio * 0.6, // Green decreases with speed  
-            0.2,                      // Blue constant
+            base_color[0] * brightness,
+            base_color[1] * brightness,
+            base_color[2] * brightness,
         ];
         
         CarInstance {
