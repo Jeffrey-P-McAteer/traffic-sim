@@ -1,0 +1,114 @@
+# Traffic Simulation Car Configuration
+# Defines car types, behaviors, and spawn parameters
+
+[simulation]
+total_cars = 100
+spawn_rate = 0.5      # cars per second
+simulation_duration = 300.0  # seconds
+
+# Car type definitions with different characteristics
+[[car_types]]
+id = "sedan"
+weight = 30          # percentage of traffic
+length = 4.5         # meters
+width = 1.8          # meters
+max_acceleration = 3.0  # m/s²
+max_deceleration = 8.0  # m/s²
+preferred_speed = 25.0  # m/s (90 km/h)
+
+[[car_types]]
+id = "suv"
+weight = 25
+length = 5.0
+width = 2.0
+max_acceleration = 2.5
+max_deceleration = 7.5
+preferred_speed = 23.0  # m/s (83 km/h)
+
+[[car_types]]
+id = "truck"
+weight = 15
+length = 12.0
+width = 2.5
+max_acceleration = 1.5
+max_deceleration = 6.0
+preferred_speed = 22.0  # m/s (79 km/h)
+
+[[car_types]]
+id = "sports_car"
+weight = 20
+length = 4.2
+width = 1.9
+max_acceleration = 6.0
+max_deceleration = 10.0
+preferred_speed = 30.0  # m/s (108 km/h)
+
+[[car_types]]
+id = "compact"
+weight = 10
+length = 3.8
+width = 1.7
+max_acceleration = 3.5
+max_deceleration = 8.5
+preferred_speed = 24.0  # m/s (86 km/h)
+
+# Driving behavior patterns
+[behavior.aggressive]
+name = "Aggressive Driver"
+weight = 15          # percentage of drivers
+following_distance_factor = 0.7    # multiplier for base following distance
+lane_change_frequency = 2.0        # changes per minute
+speed_variance = 1.15              # multiplier for preferred speed
+reaction_time = 0.8                # seconds
+exit_probability = 0.15            # probability of taking an exit
+
+[behavior.normal]
+name = "Normal Driver"
+weight = 60
+following_distance_factor = 1.0
+lane_change_frequency = 0.8
+speed_variance = 1.0
+reaction_time = 1.2
+exit_probability = 0.25
+
+[behavior.cautious]
+name = "Cautious Driver" 
+weight = 20
+following_distance_factor = 1.5
+lane_change_frequency = 0.3
+speed_variance = 0.85
+reaction_time = 1.0
+exit_probability = 0.35
+
+[behavior.erratic]
+name = "Erratic Driver"
+weight = 5
+following_distance_factor = 0.9
+lane_change_frequency = 3.0
+speed_variance = 1.2
+reaction_time = 1.5
+exit_probability = 0.4
+
+# Collision avoidance parameters
+[collision_avoidance]
+safety_margin = 1.5        # meters of extra spacing
+emergency_brake_distance = 20.0  # meters to start emergency braking
+warning_distance = 40.0    # meters to start slowing down
+lateral_safety_margin = 0.5 # meters for lane changes
+
+# Traffic flow parameters
+[traffic_flow]
+entry_intervals = [
+    { entry_id = "entry_1", min_interval = 2.0, max_interval = 8.0 },
+    { entry_id = "entry_2", min_interval = 3.0, max_interval = 10.0 }
+]
+
+# Random seed for reproducible simulations
+[random]
+seed = 42
+
+# Performance monitoring
+[performance]
+enable_gpu_timing = true
+enable_cpu_timing = true
+timing_samples = 100     # number of frames to average timing over

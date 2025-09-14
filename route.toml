@@ -1,0 +1,66 @@
+# Traffic Simulation Route Configuration
+# Donut-shaped highway with interior entrances and exterior exits
+
+[route]
+name = "Highway Donut"
+description = "Circular highway with 2 interior entrances and 2 exterior exits"
+
+# Route geometry - donut shape with inner and outer radii
+[route.geometry]
+type = "donut"
+center_x = 0.0
+center_y = 0.0
+inner_radius = 150.0  # meters
+outer_radius = 200.0  # meters
+lane_width = 3.5      # meters per lane
+lane_count = 3        # lanes in each direction
+
+# Entry points (interior - cars entering the highway)
+[[route.entries]]
+id = "entry_1"
+type = "interior"
+angle = 0.0           # degrees (0 = right, 90 = top, etc.)
+position = "inner"    # position relative to donut
+lane = 1             # which lane they enter into (1-based)
+merge_distance = 50.0 # meters to complete merge
+
+[[route.entries]]
+id = "entry_2" 
+type = "interior"
+angle = 180.0
+position = "inner"
+lane = 1
+merge_distance = 50.0
+
+# Exit points (exterior - cars leaving the highway)
+[[route.exits]]
+id = "exit_1"
+type = "exterior"
+angle = 90.0          # degrees
+position = "outer"    # position relative to donut
+lane = 3             # which lane they exit from
+exit_distance = 75.0  # meters of deceleration lane
+
+[[route.exits]]
+id = "exit_2"
+type = "exterior" 
+angle = 270.0
+position = "outer"
+lane = 3
+exit_distance = 75.0
+
+# Speed limits and traffic rules
+[route.traffic_rules]
+speed_limit = 27.8    # m/s (100 km/h, ~62 mph)
+min_speed = 13.9      # m/s (50 km/h, ~31 mph)
+following_distance = 2.0  # seconds
+lane_change_time = 3.0    # seconds to complete lane change
+
+# Traffic signals/control (none for highway)
+[route.signals]
+# Empty for this highway example
+
+# Road surface properties
+[route.surface]
+friction_coefficient = 0.7
+banking_angle = 2.0   # degrees of banking for curves
