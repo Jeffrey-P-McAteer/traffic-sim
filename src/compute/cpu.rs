@@ -51,3 +51,9 @@ impl SimulationBackend for CpuBackend {
         false
     }
 }
+
+impl CpuBackend {
+    pub fn spawn_manual_car(&mut self, behavior_name: &str, state: &mut SimulationState) {
+        self.traffic_manager.spawn_manual_car(behavior_name, state);
+    }
+}

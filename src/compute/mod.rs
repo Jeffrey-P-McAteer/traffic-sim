@@ -58,3 +58,15 @@ impl SimulationBackend for ComputeBackend {
         }
     }
 }
+
+impl ComputeBackend {
+    pub fn spawn_manual_car(&mut self, behavior_name: &str, state: &mut SimulationState) {
+        match self {
+            ComputeBackend::Cpu(backend) => backend.spawn_manual_car(behavior_name, state),
+            ComputeBackend::Gpu(backend) => {
+                log::warn!("Manual car spawning not implemented for GPU backend");
+                // TODO: Implement for GPU backend
+            }
+        }
+    }
+}

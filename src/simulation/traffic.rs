@@ -198,6 +198,84 @@ impl TrafficManager {
         self.next_car_id += 1;
     }
     
+    pub fn spawn_manual_car(&mut self, behavior_name: &str, state: &mut SimulationState) {
+        // Find an available entry point
+        let entry = if let Some(entry) = self.route.route.entries.first() {
+            entry.clone()
+        } else {
+            log::warn!("No entry points available for manual car spawn");
+            return;
+        };
+        
+        // Check if we can spawn at this entry
+        if !Self::can_spawn_at_entry_static(&entry, state, &self.route.route.geometry) {
+            log::debug!("Cannot spawn manual car - entry blocked");
+            return;
+        }
+        
+        // Select a random car type
+        let car_type_id = {
+            let total_weight: u32 = self.car_types.iter().map(|ct| ct.weight).sum();
+            let mut random_value = self.rng.gen_range(0..total_weight);
+            
+            let mut selected_type_id = self.car_types[0].id.clone();
+            for car_type in &self.car_types {
+                if random_value < car_type.weight {
+                    selected_type_id = car_type.id.clone();
+                    break;
+                }
+                random_value -= car_type.weight;
+            }
+            selected_type_id
+        };
+        
+        let car_type = self.car_types.iter().find(|ct| ct.id == car_type_id).unwrap().clone();
+        let behavior_state = self.behavior_engine.create_behavior_state(behavior_name);
+        
+        let route_geom = &self.route.route.geometry;
+        let center = Point2::new(route_geom.center_x, route_geom.center_y);
+        
+        // Calculate spawn position
+        let angle_rad = entry.angle.to_radians();
+        let radius = Self::get_lane_radius_static(entry.lane, route_geom);
+        let position = center + Vector2::new(
+            radius * angle_rad.cos(),
+            radius * angle_rad.sin()
+        );
+        
+        // Calculate initial velocity (tangent to circle)
+        let tangent_angle = angle_rad + std::f32::consts::PI / 2.0;
+        let initial_speed = car_type.preferred_speed * 0.5; // Start at half speed
+        let velocity = Vector2::new(
+            -tangent_angle.sin() * initial_speed,
+            tangent_angle.cos() * initial_speed
+        );
+        
+        let car = Car {
+            id: CarId(self.next_car_id),
+            position,
+            velocity,
+            acceleration: Vector2::zeros(),
+            heading: tangent_angle,
+            length: car_type.length,
+            width: car_type.width,
+            max_acceleration: car_type.max_acceleration,
+            max_deceleration: car_type.max_deceleration,
+            preferred_speed: car_type.preferred_speed,
+            current_lane: entry.lane,
+            target_lane: None,
+            lane_change_progress: 0.0,
+            behavior: behavior_state,
+            behavior_type: behavior_name.to_string(),
+            car_type: car_type.id.clone(),
+        };
+        
+        state.add_car(car);
+        self.next_car_id += 1;
+        
+        log::info!("Manually spawned {} car (ID: {})", behavior_name, self.next_car_id - 1);
+    }
+    
     fn update_despawning(&mut self, state: &mut SimulationState) {
         let mut cars_to_remove = Vec::new();
         

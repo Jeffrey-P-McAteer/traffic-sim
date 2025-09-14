@@ -117,6 +117,15 @@ impl UiRenderer {
                     ui.label("1-9: Speed (1x-9x)");
                     ui.label("R: Reset simulation");
                     ui.label("ESC: Exit");
+                    
+                    ui.add_space(10.0);
+                    
+                    ui.colored_label(egui::Color32::WHITE, "=== SPAWN CARS ===");
+                    ui.colored_label(egui::Color32::from_rgb(230, 50, 50), "A: Spawn Aggressive");
+                    ui.colored_label(egui::Color32::from_rgb(50, 150, 230), "N: Spawn Normal");
+                    ui.colored_label(egui::Color32::from_rgb(50, 200, 50), "C: Spawn Cautious");
+                    ui.colored_label(egui::Color32::from_rgb(230, 125, 25), "E: Spawn Erratic");
+                    ui.colored_label(egui::Color32::from_rgb(180, 50, 230), "S: Spawn Strategic");
                 });
             });
         

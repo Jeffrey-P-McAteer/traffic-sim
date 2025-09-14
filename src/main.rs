@@ -339,6 +339,27 @@ impl Application {
                         self.should_exit = true;
                         true
                     }
+                    // Manual car spawning by behavior type
+                    winit::keyboard::KeyCode::KeyA => {
+                        self.spawn_manual_car("aggressive");
+                        true
+                    }
+                    winit::keyboard::KeyCode::KeyN => {
+                        self.spawn_manual_car("normal");
+                        true
+                    }
+                    winit::keyboard::KeyCode::KeyC => {
+                        self.spawn_manual_car("cautious");
+                        true
+                    }
+                    winit::keyboard::KeyCode::KeyE => {
+                        self.spawn_manual_car("erratic");
+                        true
+                    }
+                    winit::keyboard::KeyCode::KeyS => {
+                        self.spawn_manual_car("strategic");
+                        true
+                    }
                     _ => false
                 }
             }
@@ -351,6 +372,11 @@ impl Application {
         } else {
             self.graphics.handle_input(event)
         }
+    }
+    
+    fn spawn_manual_car(&mut self, behavior_name: &str) {
+        info!("Manually spawning {} car", behavior_name);
+        self.compute_backend.spawn_manual_car(behavior_name, &mut self.simulation_state);
     }
     
     fn update_frame_timing(&mut self) {

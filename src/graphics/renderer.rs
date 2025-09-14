@@ -795,7 +795,7 @@ impl TrafficRenderer {
         let speed = car.velocity.magnitude();
         let max_speed = 30.0;
         let speed_ratio = (speed / max_speed).min(1.0);
-        let brightness = 0.4 + speed_ratio * 0.6; // Brighter when moving faster
+        let brightness = 0.7 + speed_ratio * 0.3; // Less aggressive brightness scaling
         
         let color = [
             base_color[0] * brightness,
