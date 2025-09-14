@@ -515,6 +515,9 @@ impl TrafficRenderer {
                 render_pass.set_vertex_buffer(1, self.car_instance_buffer.slice(..));
                 render_pass.draw(0..6, 0..state.cars.len() as u32);
             }
+            
+            // TODO: Add overlay rendering for spawn/exit indicators
+            // For now, let's test the rectangular car rendering
         }
         
         self.queue.submit(std::iter::once(encoder.finish()));
@@ -524,15 +527,20 @@ impl TrafficRenderer {
     }
     
     fn create_car_vertices() -> Vec<Vertex> {
+        // Car is at least 2x longer than it is wide, like a real car
+        // Short edge (width) faces forward in direction of travel (Y axis)  
+        // Long edge (length) runs perpendicular to travel direction (X axis)
+        // Width = 0.5 (Y axis, from -0.25 to +0.25), Length = 1.0 (X axis, from -0.5 to +0.5)
         vec![
-            // Triangle 1
-            Vertex { position: [-0.5, -1.0, 0.0], color: [1.0, 0.0, 0.0] },
-            Vertex { position: [0.5, -1.0, 0.0], color: [1.0, 0.0, 0.0] },
-            Vertex { position: [0.0, 1.0, 0.0], color: [1.0, 0.0, 0.0] },
-            // Triangle 2 (to make a simple car shape)
-            Vertex { position: [-0.5, -1.0, 0.0], color: [0.8, 0.0, 0.0] },
-            Vertex { position: [0.5, -1.0, 0.0], color: [0.8, 0.0, 0.0] },
-            Vertex { position: [0.0, -0.5, 0.0], color: [0.8, 0.0, 0.0] },
+            // Rectangle as two triangles - short edge forward along Y axis
+            // Triangle 1 (top-left, bottom-left, top-right)
+            Vertex { position: [-0.5, 0.25, 0.0], color: [1.0, 1.0, 1.0] },   // Top-left (long side)
+            Vertex { position: [-0.5, -0.25, 0.0], color: [1.0, 1.0, 1.0] },  // Bottom-left  
+            Vertex { position: [0.5, 0.25, 0.0], color: [1.0, 1.0, 1.0] },    // Top-right
+            // Triangle 2 (bottom-left, bottom-right, top-right)
+            Vertex { position: [-0.5, -0.25, 0.0], color: [1.0, 1.0, 1.0] },  // Bottom-left
+            Vertex { position: [0.5, -0.25, 0.0], color: [1.0, 1.0, 1.0] },   // Bottom-right
+            Vertex { position: [0.5, 0.25, 0.0], color: [1.0, 1.0, 1.0] },    // Top-right
         ]
     }
     

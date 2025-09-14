@@ -35,6 +35,8 @@ pub struct Car {
     pub car_type: String,
     pub speed_history: [f32; 3], // Last 3 speed measurements
     pub marked_for_exit: bool, // Car should exit at next opportunity
+    pub spawn_time: f32, // Time when car was spawned
+    pub exit_time: Option<f32>, // Time when car was marked for exit
 }
 
 impl Car {
@@ -149,6 +151,7 @@ impl SimulationState {
         for car in &mut self.cars {
             if car.behavior_type == behavior_type && !car.marked_for_exit {
                 car.marked_for_exit = true;
+                car.exit_time = Some(self.time);
                 return true; // Successfully marked a car
             }
         }

@@ -195,6 +195,8 @@ impl TrafficManager {
             car_type: car_type.id.clone(),
             speed_history: [initial_speed, initial_speed, initial_speed],
             marked_for_exit: false,
+            spawn_time: state.time,
+            exit_time: None,
         };
         
         state.add_car(car);
@@ -273,6 +275,8 @@ impl TrafficManager {
             car_type: car_type.id.clone(),
             speed_history: [initial_speed, initial_speed, initial_speed],
             marked_for_exit: false,
+            spawn_time: state.time,
+            exit_time: None,
         };
         
         state.add_car(car);
