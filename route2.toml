@@ -11,6 +11,8 @@ type = "cloverleaf"
 center_x = 0.0
 center_y = 0.0
 # Main highway dimensions
+inner_radius = 100.0      # meters - required field for compatibility
+outer_radius = 200.0      # meters - outer boundary of the interchange
 highway_width = 100.0     # meters (width of main highway section)
 highway_length = 400.0    # meters (length of main highway section)
 lane_width = 3.5          # meters per lane

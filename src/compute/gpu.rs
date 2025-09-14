@@ -145,8 +145,7 @@ __kernel void update_physics(
     // Apply speed limits
     target_speed = clamp(target_speed, r->min_speed, r->speed_limit);
     
-    // Calculate acceleration
-    const float current_speed = sqrt(car->vel_x * car->vel_x + car->vel_y * car->vel_y);
+    // Calculate acceleration (reuse current_speed from above)
     const float speed_diff = target_speed - current_speed;
     const float accel_mag = (speed_diff > 0.0f) ? 
         min(speed_diff / dt, car->max_accel) : 
