@@ -253,11 +253,11 @@ impl UiRenderer {
 
                             // Color bars based on speed range
                             let color = if i < 4 {
-                                egui::Color32::from_rgb(100, 255, 100) // Slow = green
+                                egui::Color32::from_rgb(255, 100, 100) // Slow = red
                             } else if i < 12 {
                                 egui::Color32::from_rgb(255, 255, 100) // Medium = yellow
                             } else {
-                                egui::Color32::from_rgb(255, 100, 100) // Fast = red
+                                egui::Color32::from_rgb(100, 255, 100) // Fast = green
                             };
 
                             ui.painter().rect_filled(bar_rect, 1.0, color);
