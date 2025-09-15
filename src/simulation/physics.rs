@@ -185,8 +185,8 @@ impl PhysicsEngine {
         let (front_car, front_distance) = self.find_front_car_straight(car, state);
         let following_distance = self.calculate_following_distance(car);
         
-        // Calculate desired speed based on traffic and behavior
-        let mut target_speed = car.behavior.target_speed;
+        // Calculate desired speed based on traffic and behavior with driver profile acceleration
+        let mut target_speed = self.calculate_driver_profile_target_speed(car, state);
         
         // Collision avoidance
         if let Some(distance) = front_distance {
@@ -223,71 +223,182 @@ impl PhysicsEngine {
         }
     }
     
+    fn calculate_driver_profile_target_speed(&self, car: &Car, state: &SimulationState) -> f32 {
+        // Base target speed from behavior system
+        let base_target_speed = car.behavior.target_speed;
+        let current_speed = car.velocity.magnitude();
+        
+        // Check if this car recently spawned at entrance ramp speed (35 mph = 15.6 m/s)
+        let time_since_spawn = state.time - car.spawn_time;
+        let is_recent_spawn = time_since_spawn < 30.0; // Consider first 30 seconds as "recent spawn"
+        let spawned_at_ramp_speed = current_speed < 20.0; // Likely spawned at ramp speed if still under 20 m/s
+        
+        if is_recent_spawn && spawned_at_ramp_speed {
+            // Apply driver profile-based acceleration behavior for cars entering from ramps
+            let acceleration_factor = match car.behavior_type.as_str() {
+                "aggressive" => {
+                    // Aggressive drivers accelerate quickly and aim for higher speeds
+                    let target_fraction = (time_since_spawn / 15.0).min(1.0); // Reach target in 15 seconds
+                    15.6 + (base_target_speed * 1.1 - 15.6) * target_fraction.powf(0.7) // Quick initial acceleration
+                }
+                "erratic" => {
+                    // Erratic drivers have inconsistent acceleration patterns
+                    let erratic_factor = 0.8 + 0.4 * (time_since_spawn * 0.5).sin().abs(); // Oscillating behavior
+                    let target_fraction = (time_since_spawn / 20.0).min(1.0); // Reach target in 20 seconds
+                    15.6 + (base_target_speed * erratic_factor - 15.6) * target_fraction
+                }
+                "strategic" => {
+                    // Strategic drivers accelerate smoothly and efficiently
+                    let target_fraction = (time_since_spawn / 18.0).min(1.0); // Reach target in 18 seconds
+                    15.6 + (base_target_speed - 15.6) * target_fraction.powf(1.2) // Smooth progressive acceleration
+                }
+                "cautious" => {
+                    // Cautious drivers accelerate slowly and stay below target speed initially
+                    let target_fraction = (time_since_spawn / 25.0).min(1.0); // Reach target in 25 seconds
+                    15.6 + (base_target_speed * 0.9 - 15.6) * target_fraction.powf(1.5) // Gradual acceleration
+                }
+                "normal" | _ => {
+                    // Normal drivers have standard acceleration curve
+                    let target_fraction = (time_since_spawn / 20.0).min(1.0); // Reach target in 20 seconds
+                    15.6 + (base_target_speed - 15.6) * target_fraction // Linear acceleration
+                }
+            };
+            
+            // Ensure we don't exceed the base target speed (unless aggressive)
+            if car.behavior_type == "aggressive" {
+                acceleration_factor.min(base_target_speed * 1.15) // Allow 15% overspeed for aggressive
+            } else {
+                acceleration_factor.min(base_target_speed)
+            }
+        } else {
+            // Use normal behavior target speed for established traffic
+            base_target_speed
+        }
+    }
+    
     fn calculate_cloverleaf_path(&self, car: &Car, target_speed: f32, dt: f32) -> (String, Point, Vector2<f32>, f32) {
-        // Lane assignments for cloverleaf:
-        // Lanes 1-3:  North-South Southbound (top to bottom)
-        // Lanes 4-6:  North-South Northbound (bottom to top)  
-        // Lanes 7-9:  East-West Westbound (right to left)
-        // Lanes 10-12: East-West Eastbound (left to right)
+        // Right-side driving cloverleaf lane assignments:
+        // North-South Highway:
+        //   Lanes 1-3:  Southbound (top to bottom) on WEST side (-x)
+        //   Lanes 4-6:  Northbound (bottom to top) on EAST side (+x)
+        // East-West Highway:  
+        //   Lanes 7-9:  Westbound (right to left) on NORTH side (+y)
+        //   Lanes 10-12: Eastbound (left to right) on SOUTH side (-y)
         
         let route_geom = &self.route.route.geometry;
         let highway_half_width = route_geom.highway_width.unwrap_or(40.0) / 2.0;
+        let lane_separation = highway_half_width + 5.0; // Extra separation between opposite directions
         
         match car.current_lane {
-            // North-South Southbound (lanes 1-3)
+            // North-South Southbound (lanes 1-3) - West side of highway
             1..=3 => {
                 let lane_offset = ((car.current_lane as i32) - 2) as f32 * route_geom.lane_width; // -3.5, 0, 3.5
-                let x_pos = lane_offset;
+                let x_pos = -lane_separation + lane_offset; // West side with lane offset
                 let y_pos = car.position.y - target_speed * dt;
                 let heading = -std::f32::consts::PI / 2.0; // Pointing south
                 let velocity = Vector2::new(0.0, -target_speed);
                 
                 ("southbound".to_string(), Point2::new(x_pos, y_pos), velocity, heading)
             }
-            // North-South Northbound (lanes 4-6)
+            // North-South Northbound (lanes 4-6) - East side of highway
             4..=6 => {
-                let lane_offset = (5 - (car.current_lane as i32)) as f32 * route_geom.lane_width; // 3.5, 0, -3.5
-                let x_pos = lane_offset;
+                let lane_offset = ((car.current_lane as i32) - 5) as f32 * route_geom.lane_width; // -3.5, 0, 3.5
+                let x_pos = lane_separation + lane_offset; // East side with lane offset
                 let y_pos = car.position.y + target_speed * dt;
                 let heading = std::f32::consts::PI / 2.0; // Pointing north
                 let velocity = Vector2::new(0.0, target_speed);
                 
                 ("northbound".to_string(), Point2::new(x_pos, y_pos), velocity, heading)
             }
-            // East-West Westbound (lanes 7-9)
+            // East-West Westbound (lanes 7-9) - North side of highway
             7..=9 => {
-                let lane_offset = (8 - (car.current_lane as i32)) as f32 * route_geom.lane_width; // 3.5, 0, -3.5
-                let y_pos = lane_offset;
+                let lane_offset = ((car.current_lane as i32) - 8) as f32 * route_geom.lane_width; // -3.5, 0, 3.5
+                let y_pos = lane_separation + lane_offset; // North side with lane offset
                 let x_pos = car.position.x - target_speed * dt;
                 let heading = std::f32::consts::PI; // Pointing west
                 let velocity = Vector2::new(-target_speed, 0.0);
                 
                 ("westbound".to_string(), Point2::new(x_pos, y_pos), velocity, heading)
             }
-            // East-West Eastbound (lanes 10-12)
+            // East-West Eastbound (lanes 10-12) - South side of highway
             10..=12 => {
                 let lane_offset = ((car.current_lane as i32) - 11) as f32 * route_geom.lane_width; // -3.5, 0, 3.5
-                let y_pos = lane_offset;
+                let y_pos = -lane_separation + lane_offset; // South side with lane offset
                 let x_pos = car.position.x + target_speed * dt;
                 let heading = 0.0; // Pointing east
                 let velocity = Vector2::new(target_speed, 0.0);
                 
                 ("eastbound".to_string(), Point2::new(x_pos, y_pos), velocity, heading)
             }
-            // Loop ramps or invalid lanes - maintain current direction
+            // Loop ramps - curved circular motion
             _ => {
-                let current_heading = if car.velocity.magnitude() > 0.1 {
-                    car.velocity.y.atan2(car.velocity.x)
-                } else {
-                    0.0
-                };
-                let velocity_direction = Vector2::new(current_heading.cos(), current_heading.sin());
-                let new_velocity = velocity_direction * target_speed;
-                let new_position = car.position + new_velocity * dt;
-                
-                ("loop".to_string(), new_position, new_velocity, current_heading)
+                self.calculate_curved_ramp_path(car, target_speed, dt)
             }
         }
+    }
+    
+    fn calculate_curved_ramp_path(&self, car: &Car, target_speed: f32, dt: f32) -> (String, Point, Vector2<f32>, f32) {
+        // Determine which loop ramp the car is on based on its position
+        let route_geom = &self.route.route.geometry;
+        let loop_radius = route_geom.loop_radius.unwrap_or(60.0);
+        let highway_half_width = route_geom.highway_width.unwrap_or(40.0) / 2.0;
+        let loop_offset = highway_half_width + loop_radius;
+        
+        // Find the closest loop ramp center
+        let loop_centers = [
+            (loop_offset, loop_offset),    // Northeast
+            (loop_offset, -loop_offset),   // Southeast  
+            (-loop_offset, -loop_offset),  // Southwest
+            (-loop_offset, loop_offset),   // Northwest
+        ];
+        
+        let car_pos = car.position;
+        let mut closest_center = loop_centers[0];
+        let mut min_distance = f32::INFINITY;
+        let mut ramp_index = 0;
+        
+        for (i, &center) in loop_centers.iter().enumerate() {
+            let distance = ((car_pos.x - center.0).powi(2) + (car_pos.y - center.1).powi(2)).sqrt();
+            if distance < min_distance {
+                min_distance = distance;
+                closest_center = center;
+                ramp_index = i;
+            }
+        }
+        
+        // Calculate circular motion around the ramp center
+        let center = Point2::new(closest_center.0, closest_center.1);
+        let to_car = car_pos - center;
+        let current_angle = to_car.y.atan2(to_car.x);
+        let current_radius = to_car.magnitude().max(1.0); // Prevent division by zero
+        
+        // Determine direction of travel for each loop ramp
+        let angular_direction = match ramp_index {
+            0 => -1.0, // Northeast - clockwise (for left turns)
+            1 => -1.0, // Southeast - clockwise
+            2 => -1.0, // Southwest - clockwise  
+            3 => -1.0, // Northwest - clockwise
+            _ => -1.0, // Default clockwise
+        };
+        
+        // Calculate angular velocity from target speed
+        let angular_velocity = angular_direction * target_speed / current_radius;
+        let new_angle = current_angle + angular_velocity * dt;
+        
+        // Calculate new position on the circular path
+        let new_position = center + current_radius * Vector2::new(new_angle.cos(), new_angle.sin());
+        
+        // Calculate tangential velocity
+        let tangent_angle = new_angle + angular_direction * std::f32::consts::PI / 2.0;
+        let velocity = Vector2::new(
+            target_speed * tangent_angle.cos(),
+            target_speed * tangent_angle.sin()
+        );
+        
+        // Heading follows velocity direction
+        let heading = velocity.y.atan2(velocity.x);
+        
+        ("loop_ramp".to_string(), new_position, velocity, heading)
     }
     
     fn find_front_car_straight<'a>(&self, car: &Car, state: &'a SimulationState) -> (Option<&'a Car>, Option<f32>) {

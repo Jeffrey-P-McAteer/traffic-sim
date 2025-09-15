@@ -22,6 +22,25 @@ loop_radius = 60.0        # meters - radius of the quarter-circle loop ramps
 ramp_width = 7.0          # meters - width of each loop ramp
 ramp_lanes = 1            # single lane per loop ramp
 
+# Curved ramp geometry for realistic cloverleaf physics
+[route.geometry.ramps]
+# Loop ramp centers (relative to interchange center)
+ne_center_x = 85.0        # Northeast loop center position
+ne_center_y = 85.0
+se_center_x = 85.0        # Southeast loop center position  
+se_center_y = -85.0
+sw_center_x = -85.0       # Southwest loop center position
+sw_center_y = -85.0
+nw_center_x = -85.0       # Northwest loop center position
+nw_center_y = 85.0
+
+# Loop ramp arc parameters
+start_angles = [180.0, 270.0, 0.0, 90.0]  # Starting angles for NE, SE, SW, NW loops
+arc_length = 270.0        # degrees - 270° clockwise turn for left turns
+curve_direction = -1.0    # -1 for clockwise, +1 for counter-clockwise
+banking_angle = 8.0       # degrees - banking for safer high-speed turns
+design_speed = 50.0       # km/h - design speed for loop ramps
+
 # =============================================================================
 # HIGHWAY THROUGH-TRAFFIC ENTRY/EXIT POINTS
 # Cars traveling straight through the interchange

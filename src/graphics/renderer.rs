@@ -717,14 +717,16 @@ impl TrafficRenderer {
     }
     
     fn create_cloverleaf_road_vertices() -> Vec<Vertex> {
-        // Create realistic cloverleaf interchange with two intersecting highways
+        // Create realistic cloverleaf interchange with separated highways for right-side driving
         let mut vertices = Vec::new();
         
-        // Highway dimensions based on route2.toml
+        // Highway dimensions based on route2.toml and physics separation
         let highway_width = 40.0;        // Width of each direction
         let highway_extent = 300.0;      // How far highways extend from center
         let loop_radius = 60.0;          // Radius of loop ramps
         let lane_width = 3.5;            // Width per lane
+        let highway_half_width = highway_width / 2.0;
+        let lane_separation = highway_half_width + 5.0; // Same separation as physics
         
         // Highway colors
         let highway_color = [0.2, 0.2, 0.2];      // Dark gray for main highways
@@ -732,31 +734,47 @@ impl TrafficRenderer {
         let line_color = [0.8, 0.8, 0.8];        // White lane markings
         
         // =============================================================================
-        // MAIN HIGHWAYS - Two intersecting straight highways
+        // SEPARATED HIGHWAYS - Right-side driving with clear separation
         // =============================================================================
         
-        // North-South Highway (vertical)
-        let ns_left = -highway_width / 2.0;
-        let ns_right = highway_width / 2.0;
+        // North-South Highway - Southbound (west side) and Northbound (east side)
+        // Southbound lanes (1-3) on west side
+        let ns_sb_left = -lane_separation - highway_half_width;
+        let ns_sb_right = -lane_separation + highway_half_width;
         let ns_top = highway_extent;
         let ns_bottom = -highway_extent;
         
-        Self::add_rectangle(&mut vertices, ns_left, ns_right, ns_bottom, ns_top, highway_color);
+        Self::add_rectangle(&mut vertices, ns_sb_left, ns_sb_right, ns_bottom, ns_top, highway_color);
         
-        // East-West Highway (horizontal)  
+        // Northbound lanes (4-6) on east side
+        let ns_nb_left = lane_separation - highway_half_width;
+        let ns_nb_right = lane_separation + highway_half_width;
+        
+        Self::add_rectangle(&mut vertices, ns_nb_left, ns_nb_right, ns_bottom, ns_top, highway_color);
+        
+        // East-West Highway - Westbound (north side) and Eastbound (south side)
         let ew_left = -highway_extent;
         let ew_right = highway_extent;
-        let ew_bottom = -highway_width / 2.0;
-        let ew_top = highway_width / 2.0;
         
-        Self::add_rectangle(&mut vertices, ew_left, ew_right, ew_bottom, ew_top, highway_color);
+        // Westbound lanes (7-9) on north side
+        let ew_wb_bottom = lane_separation - highway_half_width;
+        let ew_wb_top = lane_separation + highway_half_width;
+        
+        Self::add_rectangle(&mut vertices, ew_left, ew_right, ew_wb_bottom, ew_wb_top, highway_color);
+        
+        // Eastbound lanes (10-12) on south side
+        let ew_eb_bottom = -lane_separation - highway_half_width;
+        let ew_eb_top = -lane_separation + highway_half_width;
+        
+        Self::add_rectangle(&mut vertices, ew_left, ew_right, ew_eb_bottom, ew_eb_top, highway_color);
         
         // =============================================================================
         // CLOVERLEAF LOOP RAMPS - Four quarter-circle ramps in each quadrant
         // =============================================================================
         
-        // Calculate loop ramp positions (outside the highway intersection)
-        let loop_offset = highway_width / 2.0 + loop_radius;
+        // Calculate loop ramp positions (outside the highway intersection) 
+        // Match physics calculations for consistency
+        let loop_offset = highway_half_width + loop_radius;
         
         // Northeast Loop (for southbound→eastbound left turns)
         let ne_center = (loop_offset, loop_offset);
@@ -775,43 +793,35 @@ impl TrafficRenderer {
         Self::add_quarter_circle_ramp(&mut vertices, nw_center.0, nw_center.1, loop_radius, 90.0, ramp_color);
         
         // =============================================================================
-        // LANE MARKINGS - Dividing lines between lanes
+        // LANE MARKINGS - Dividing lines between lanes for separated highways
         // =============================================================================
         
         let line_width = 0.2;
         let line_z = 0.01; // Slightly above road surface
         
-        // North-South Highway lane markings (3 lanes each direction = 6 lanes total)
-        // Southbound lanes (lanes 1-3): right side of highway
+        // North-South Highway lane markings
+        // Southbound lanes (lanes 1-3) on west side
         for lane in 1..3 { // 2 divider lines between 3 lanes
-            let x_pos = ns_left + lane as f32 * lane_width;
+            let x_pos = ns_sb_left + lane as f32 * lane_width;
             Self::add_vertical_line_z(&mut vertices, ns_bottom, ns_top, x_pos, line_width, line_color, line_z);
         }
         
-        // Center divider between north/southbound
-        let center_x = 0.0;
-        Self::add_vertical_line_z(&mut vertices, ns_bottom, ns_top, center_x, line_width * 2.0, line_color, line_z);
-        
-        // Northbound lanes (lanes 4-6): left side of highway  
+        // Northbound lanes (lanes 4-6) on east side
         for lane in 1..3 { // 2 divider lines between 3 lanes
-            let x_pos = ns_right - lane as f32 * lane_width;
+            let x_pos = ns_nb_left + lane as f32 * lane_width;
             Self::add_vertical_line_z(&mut vertices, ns_bottom, ns_top, x_pos, line_width, line_color, line_z);
         }
         
-        // East-West Highway lane markings (3 lanes each direction = 6 lanes total)
-        // Westbound lanes (lanes 7-9): top side of highway
+        // East-West Highway lane markings
+        // Westbound lanes (lanes 7-9) on north side
         for lane in 1..3 { // 2 divider lines between 3 lanes
-            let y_pos = ew_top - lane as f32 * lane_width;
+            let y_pos = ew_wb_bottom + lane as f32 * lane_width;
             Self::add_horizontal_line_z(&mut vertices, ew_left, ew_right, y_pos, line_width, line_color, line_z);
         }
         
-        // Center divider between east/westbound
-        let center_y = 0.0;
-        Self::add_horizontal_line_z(&mut vertices, ew_left, ew_right, center_y, line_width * 2.0, line_color, line_z);
-        
-        // Eastbound lanes (lanes 10-12): bottom side of highway
+        // Eastbound lanes (lanes 10-12) on south side
         for lane in 1..3 { // 2 divider lines between 3 lanes
-            let y_pos = ew_bottom + lane as f32 * lane_width;
+            let y_pos = ew_eb_bottom + lane as f32 * lane_width;
             Self::add_horizontal_line_z(&mut vertices, ew_left, ew_right, y_pos, line_width, line_color, line_z);
         }
         

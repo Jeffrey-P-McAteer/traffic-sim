@@ -187,7 +187,7 @@ impl TrafficManager {
         let (initial_velocity, heading) = Self::calculate_entry_velocity(entry, route_geom, &position);
         
         // Adaptive speed based on nearby traffic conditions
-        let mut initial_speed = 26.8; // 60 mph in m/s (60 / 2.237 = 26.8) - default speed
+        let mut initial_speed = 15.6; // 35 mph in m/s (35 / 2.237 = 15.6) - entrance ramp speed
         
         // Check nearby cars and adjust spawn speed to match traffic flow
         let check_radius = 30.0; // meters
@@ -279,7 +279,7 @@ impl TrafficManager {
         let (initial_velocity, heading) = Self::calculate_entry_velocity(&entry, route_geom, &position);
         
         // For manual spawning, be more conservative with speed matching to ensure safety
-        let mut initial_speed = 20.0; // Slightly slower default for manual spawning
+        let mut initial_speed = 15.6; // 35 mph for entrance ramp spawning
         
         // Check nearby cars and adjust spawn speed to match traffic flow
         let check_radius = 25.0; // meters - smaller radius for manual spawning
@@ -411,41 +411,93 @@ impl TrafficManager {
     }
     
     fn calculate_cloverleaf_entry_position(entry: &crate::config::EntryPoint, route_geom: &crate::config::RouteGeometry) -> Point2<f32> {
-        // For cloverleaf, position cars based on lane numbers and highway layout
-        // Lane assignments:
-        // Lanes 1-3:  North-South Southbound (top to bottom) - spawn at north edge
-        // Lanes 4-6:  North-South Northbound (bottom to top) - spawn at south edge
-        // Lanes 7-9:  East-West Westbound (right to left) - spawn at east edge  
-        // Lanes 10-12: East-West Eastbound (left to right) - spawn at west edge
+        // Check if this is a loop ramp entry based on entry type
+        if entry.entry_type == "loop_ramp" {
+            // Spawn cars on entrance ramps (loop ramps) for realistic cloverleaf behavior
+            return Self::calculate_loop_ramp_entry_position(entry, route_geom);
+        }
+        
+        // For through traffic, spawn at highway edges with proper right-side driving
+        // Right-side driving lane assignments:
+        // North-South Highway:
+        //   Lanes 1-3:  Southbound on WEST side - spawn at north edge  
+        //   Lanes 4-6:  Northbound on EAST side - spawn at south edge
+        // East-West Highway:
+        //   Lanes 7-9:  Westbound on NORTH side - spawn at east edge
+        //   Lanes 10-12: Eastbound on SOUTH side - spawn at west edge
         
         let highway_extent = 250.0; // How far from center to spawn
         let lane_width = route_geom.lane_width;
+        let highway_half_width = route_geom.highway_width.unwrap_or(40.0) / 2.0;
+        let lane_separation = highway_half_width + 5.0; // Same separation as physics
         
         match entry.lane {
-            // North-South Southbound (lanes 1-3) - spawn at north edge
+            // North-South Southbound (lanes 1-3) - spawn at north edge, west side
             1..=3 => {
                 let lane_offset = ((entry.lane as i32) - 2) as f32 * lane_width; // -3.5, 0, 3.5
-                Point2::new(lane_offset, highway_extent) // North edge
+                let x_pos = -lane_separation + lane_offset; // West side
+                Point2::new(x_pos, highway_extent) // North edge
             }
-            // North-South Northbound (lanes 4-6) - spawn at south edge
+            // North-South Northbound (lanes 4-6) - spawn at south edge, east side
             4..=6 => {
-                let lane_offset = (5 - (entry.lane as i32)) as f32 * lane_width; // 3.5, 0, -3.5
-                Point2::new(lane_offset, -highway_extent) // South edge
+                let lane_offset = ((entry.lane as i32) - 5) as f32 * lane_width; // -3.5, 0, 3.5
+                let x_pos = lane_separation + lane_offset; // East side
+                Point2::new(x_pos, -highway_extent) // South edge
             }
-            // East-West Westbound (lanes 7-9) - spawn at east edge
+            // East-West Westbound (lanes 7-9) - spawn at east edge, north side
             7..=9 => {
-                let lane_offset = (8 - (entry.lane as i32)) as f32 * lane_width; // 3.5, 0, -3.5
-                Point2::new(highway_extent, lane_offset) // East edge
+                let lane_offset = ((entry.lane as i32) - 8) as f32 * lane_width; // -3.5, 0, 3.5
+                let y_pos = lane_separation + lane_offset; // North side
+                Point2::new(highway_extent, y_pos) // East edge
             }
-            // East-West Eastbound (lanes 10-12) - spawn at west edge
+            // East-West Eastbound (lanes 10-12) - spawn at west edge, south side
             10..=12 => {
                 let lane_offset = ((entry.lane as i32) - 11) as f32 * lane_width; // -3.5, 0, 3.5
-                Point2::new(-highway_extent, lane_offset) // West edge
+                let y_pos = -lane_separation + lane_offset; // South side
+                Point2::new(-highway_extent, y_pos) // West edge
             }
             // Invalid lane - spawn at center
             _ => {
                 log::warn!("Invalid lane {} for cloverleaf, spawning at center", entry.lane);
                 Point2::new(0.0, 0.0)
+            }
+        }
+    }
+    
+    fn calculate_loop_ramp_entry_position(entry: &crate::config::EntryPoint, route_geom: &crate::config::RouteGeometry) -> Point2<f32> {
+        // Calculate entrance ramp positions based on loop locations
+        // Loop ramps are positioned outside the main highway intersection for realistic merging
+        let loop_radius = route_geom.loop_radius.unwrap_or(60.0);
+        let highway_half_width = route_geom.highway_width.unwrap_or(40.0) / 2.0;
+        let ramp_offset = loop_radius + highway_half_width + 20.0; // Position ramps outside highways
+        
+        // Determine ramp position based on entry ID or lane
+        match entry.id.as_str() {
+            "ne_loop_entry" => {
+                // Northeast loop: for southbound traffic turning left to eastbound
+                Point2::new(ramp_offset, ramp_offset) 
+            }
+            "se_loop_entry" => {
+                // Southeast loop: for eastbound traffic turning left to northbound
+                Point2::new(ramp_offset, -ramp_offset)
+            }
+            "sw_loop_entry" => {
+                // Southwest loop: for northbound traffic turning left to westbound
+                Point2::new(-ramp_offset, -ramp_offset)
+            }
+            "nw_loop_entry" => {
+                // Northwest loop: for westbound traffic turning left to southbound
+                Point2::new(-ramp_offset, ramp_offset)
+            }
+            _ => {
+                // Fallback: place ramp based on target lane
+                match entry.lane {
+                    1..=3 => Point2::new(ramp_offset, ramp_offset),    // Northeast
+                    4..=6 => Point2::new(-ramp_offset, -ramp_offset),  // Southwest  
+                    7..=9 => Point2::new(-ramp_offset, ramp_offset),   // Northwest
+                    10..=12 => Point2::new(ramp_offset, -ramp_offset), // Southeast
+                    _ => Point2::new(0.0, 0.0) // Center as fallback
+                }
             }
         }
     }
@@ -473,7 +525,12 @@ impl TrafficManager {
     }
     
     fn calculate_cloverleaf_entry_velocity(entry: &crate::config::EntryPoint) -> (Vector2<f32>, f32) {
-        // For cloverleaf, calculate velocity based on lane assignments
+        // Check if this is a loop ramp entry - cars start on ramps heading toward merge point
+        if entry.entry_type == "loop_ramp" {
+            return Self::calculate_loop_ramp_entry_velocity(entry);
+        }
+        
+        // For through traffic, calculate velocity based on lane assignments
         match entry.lane {
             // North-South Southbound (lanes 1-3) - heading south  
             1..=3 => (Vector2::new(0.0, -1.0), -std::f32::consts::PI / 2.0),
@@ -487,6 +544,39 @@ impl TrafficManager {
             _ => {
                 log::warn!("Invalid lane {} for cloverleaf velocity, defaulting to east", entry.lane);
                 (Vector2::new(1.0, 0.0), 0.0)
+            }
+        }
+    }
+    
+    fn calculate_loop_ramp_entry_velocity(entry: &crate::config::EntryPoint) -> (Vector2<f32>, f32) {
+        // Calculate initial velocity for cars entering from loop ramps
+        // Cars on ramps initially head toward the merge point on the main highway
+        match entry.id.as_str() {
+            "ne_loop_entry" => {
+                // Northeast loop: cars head southwest toward eastbound highway
+                (Vector2::new(-0.707, -0.707), -3.0 * std::f32::consts::PI / 4.0)
+            }
+            "se_loop_entry" => {
+                // Southeast loop: cars head northwest toward northbound highway  
+                (Vector2::new(-0.707, 0.707), 3.0 * std::f32::consts::PI / 4.0)
+            }
+            "sw_loop_entry" => {
+                // Southwest loop: cars head northeast toward westbound highway
+                (Vector2::new(0.707, 0.707), std::f32::consts::PI / 4.0)
+            }
+            "nw_loop_entry" => {
+                // Northwest loop: cars head southeast toward southbound highway
+                (Vector2::new(0.707, -0.707), -std::f32::consts::PI / 4.0)
+            }
+            _ => {
+                // Fallback based on target lane direction
+                match entry.lane {
+                    1..=3 => (Vector2::new(-0.707, -0.707), -3.0 * std::f32::consts::PI / 4.0), // NE loop
+                    4..=6 => (Vector2::new(0.707, 0.707), std::f32::consts::PI / 4.0),         // SW loop
+                    7..=9 => (Vector2::new(0.707, -0.707), -std::f32::consts::PI / 4.0),      // NW loop
+                    10..=12 => (Vector2::new(-0.707, 0.707), 3.0 * std::f32::consts::PI / 4.0), // SE loop
+                    _ => (Vector2::new(1.0, 0.0), 0.0) // Default eastward
+                }
             }
         }
     }
