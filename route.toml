@@ -13,7 +13,7 @@ center_y = 0.0
 inner_radius = 150.0  # meters
 outer_radius = 200.0  # meters
 lane_width = 3.5      # meters per lane
-lane_count = 3        # lanes in each direction
+lane_count = 6        # lanes in each direction
 
 # Entry points (interior - cars entering the highway)
 [[route.entries]]
@@ -22,7 +22,7 @@ type = "interior"
 angle = 0.0           # degrees (0 = right, 90 = top, etc.)
 position = "inner"    # position relative to donut
 lane = 1             # which lane they enter into (1-based)
-merge_distance = 50.0 # meters to complete merge
+merge_distance = 40.0 # meters to complete merge
 
 [[route.entries]]
 id = "entry_2"

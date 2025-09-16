@@ -41,6 +41,23 @@ pub struct RouteGeometry {
     pub ramp_width: Option<f32>,
     #[serde(default)]
     pub ramp_lanes: Option<u32>,
+    // Grid-specific fields
+    #[serde(default)]
+    pub grid: Option<Vec<Vec<String>>>,
+    #[serde(default)]
+    pub cell_size: Option<f32>,
+    #[serde(default)]
+    pub spawn_points: Option<Vec<GridPoint>>,
+    #[serde(default)]
+    pub exit_points: Option<Vec<GridPoint>>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct GridPoint {
+    pub id: String,
+    pub row: usize,
+    pub col: usize,
+    pub weight: Option<f32>, // probability weight for random selection
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -92,16 +109,66 @@ impl Validate for RouteConfig {
     fn validate(&self) -> Result<()> {
         let geometry = &self.route.geometry;
         
-        if geometry.geometry_type != "donut" && geometry.geometry_type != "cloverleaf" {
-            return Err(anyhow!("Only 'donut' and 'cloverleaf' geometry types are currently supported"));
+        if geometry.geometry_type != "donut" && geometry.geometry_type != "cloverleaf" && geometry.geometry_type != "grid" {
+            return Err(anyhow!("Only 'donut', 'cloverleaf', and 'grid' geometry types are currently supported"));
         }
         
-        if geometry.inner_radius >= geometry.outer_radius {
-            return Err(anyhow!("Inner radius must be less than outer radius"));
+        // Validate grid-specific fields
+        if geometry.geometry_type == "grid" {
+            if let Some(grid) = &geometry.grid {
+                if grid.is_empty() {
+                    return Err(anyhow!("Grid cannot be empty"));
+                }
+                
+                let row_length = grid[0].len();
+                for (i, row) in grid.iter().enumerate() {
+                    if row.len() != row_length {
+                        return Err(anyhow!("All grid rows must have the same length. Row {} has length {}, expected {}", i, row.len(), row_length));
+                    }
+                }
+                
+                if let Some(cell_size) = geometry.cell_size {
+                    if cell_size <= 0.0 {
+                        return Err(anyhow!("Cell size must be positive"));
+                    }
+                } else {
+                    return Err(anyhow!("Cell size is required for grid geometry"));
+                }
+                
+                // Validate spawn points are within grid bounds
+                if let Some(spawn_points) = &geometry.spawn_points {
+                    for point in spawn_points {
+                        if point.row >= grid.len() || point.col >= row_length {
+                            return Err(anyhow!("Spawn point {} is out of grid bounds at ({}, {})", point.id, point.row, point.col));
+                        }
+                    }
+                }
+                
+                // Validate exit points are within grid bounds
+                if let Some(exit_points) = &geometry.exit_points {
+                    for point in exit_points {
+                        if point.row >= grid.len() || point.col >= row_length {
+                            return Err(anyhow!("Exit point {} is out of grid bounds at ({}, {})", point.id, point.row, point.col));
+                        }
+                    }
+                }
+            } else {
+                return Err(anyhow!("Grid is required for grid geometry type"));
+            }
+        } else {
+            // Non-grid geometry validation
+            if geometry.inner_radius >= geometry.outer_radius {
+                return Err(anyhow!("Inner radius must be less than outer radius"));
+            }
+            
+            if geometry.lane_width <= 0.0 || geometry.lane_count == 0 {
+                return Err(anyhow!("Lane width and count must be positive"));
+            }
         }
         
-        if geometry.lane_width <= 0.0 || geometry.lane_count == 0 {
-            return Err(anyhow!("Lane width and count must be positive"));
+        // For grid geometry, ensure basic lane properties are still valid
+        if geometry.geometry_type == "grid" && geometry.lane_width <= 0.0 {
+            return Err(anyhow!("Lane width must be positive even for grid geometry"));
         }
         
         // Validate entry points

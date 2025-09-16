@@ -1,0 +1,114 @@
+# Traffic Simulation Route Configuration
+# Grid-based one-way traffic circle (roundabout)
+
+[route]
+name = "One-Way Traffic Circle"
+description = "Grid-based roundabout with spawn and exit points"
+
+# Route geometry - grid specification
+[route.geometry]
+type = "grid"
+center_x = 0.0
+center_y = 0.0
+cell_size = 20.0  # meters per grid cell
+inner_radius = 0.0  # not used for grid type
+outer_radius = 0.0  # not used for grid type
+lane_width = 3.5   # meters per lane
+lane_count = 1     # single lane roundabout
+
+# Grid layout - each cell represents a 20m x 20m area
+# Legend:
+#   ' ' = empty space
+#   '|' = vertical road segment (north-south)
+#   '-' = horizontal road segment (east-west) 
+#   'o' = center of roundabout
+#   '/' = northeast curve
+#   '\' = northwest curve
+#   '.' = southeast curve  
+#   ',' = southwest curve
+#   'S' = spawn point
+#   'X' = exit point
+grid = [
+    [' ', ' ', 'S', ' ', ' '],
+    [' ', '/', '-', '\', ' '],
+    ['S', '|', 'o', '|', 'X'],
+    [' ', ',', '-', '.', ' '],
+    [' ', ' ', 'X', ' ', ' ']
+]
+
+# Spawn points - where cars enter the roundabout
+[[route.geometry.spawn_points]]
+id = "north_spawn"
+row = 0
+col = 2
+weight = 1.0
+
+[[route.geometry.spawn_points]]  
+id = "west_spawn"
+row = 2
+col = 0
+weight = 1.0
+
+# Exit points - where cars leave the roundabout
+[[route.geometry.exit_points]]
+id = "east_exit"
+row = 2
+col = 4
+weight = 1.0
+
+[[route.geometry.exit_points]]
+id = "south_exit"
+row = 4
+col = 2
+weight = 1.0
+
+# Entry points for simulation (mapped from spawn points)
+[[route.entries]]
+id = "entry_north"
+type = "spawn"
+angle = 270.0  # entering from north, heading south
+position = "grid_spawn"
+lane = 1
+merge_distance = 10.0
+
+[[route.entries]]
+id = "entry_west"
+type = "spawn"
+angle = 0.0    # entering from west, heading east
+position = "grid_spawn"
+lane = 1
+merge_distance = 10.0
+
+# Exit points for simulation (mapped from exit points)
+[[route.exits]]
+id = "exit_east"
+type = "grid_exit"
+angle = 0.0    # exiting to east
+position = "grid_exit"
+lane = 1
+exit_distance = 10.0
+
+[[route.exits]]
+id = "exit_south"
+type = "grid_exit"
+angle = 270.0  # exiting to south
+position = "grid_exit"
+lane = 1
+exit_distance = 10.0
+
+# Speed limits and traffic rules for roundabout
+[route.traffic_rules]
+speed_limit = 8.3      # m/s (30 km/h, ~19 mph) - slow for roundabout
+min_speed = 2.8        # m/s (10 km/h, ~6 mph)
+following_distance = 1.0  # seconds - closer following in roundabout
+lane_change_time = 2.0    # seconds - quicker lane changes
+
+# Traffic signals (yield-controlled roundabout)
+[route.signals]
+has_signals = false
+yield_control = true
+
+# Road surface properties
+[route.surface]
+friction_coefficient = 0.7  # slightly lower for roundabout pavement
+banking_angle = 3.0         # degrees - slight banking for drainage

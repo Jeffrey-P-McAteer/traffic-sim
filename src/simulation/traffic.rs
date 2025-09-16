@@ -80,32 +80,37 @@ impl TrafficManager {
             if *timer <= 0.0 {
                 // Try to spawn a car at this entry
                 if let Some(entry) = entries_to_check.iter().find(|e| &e.id == entry_id) {
-                    // Try regular spawning first, fallback to permissive spawning
-                    let can_spawn = Self::can_spawn_at_entry_static(entry, state, &self.route.route.geometry) ||
-                                   (state.active_cars < self.cars_config.simulation.total_cars / 2 && 
-                                    Self::can_spawn_at_entry_permissive(entry, state, &self.route.route.geometry));
+                    // Try natural spawning first, then force spawn if needed
+                    let natural_spawn = Self::can_spawn_at_entry_static(entry, state, &self.route.route.geometry) ||
+                                       Self::can_spawn_at_entry_permissive(entry, state, &self.route.route.geometry);
                     
-                    if can_spawn {
-                        spawn_requests.push((entry_id.clone(), entry.clone()));
-                        
-                        // Reset timer with random interval
-                        let base_interval = 1.0 / self.cars_config.simulation.spawn_rate;
-                        let entry_interval = self.cars_config.traffic_flow.entry_intervals
-                            .iter()
-                            .find(|ei| &ei.entry_id == entry_id);
-                        
-                        *timer = if let Some(interval) = entry_interval {
-                            self.rng.gen_range(interval.min_interval..=interval.max_interval)
-                        } else {
-                            base_interval // Use spawn_rate as default
-                        };
-                    }
+                    // Always add to spawn requests - we'll force gaps as needed
+                    spawn_requests.push((entry_id.clone(), entry.clone(), natural_spawn));
+                    
+                    // Reset timer with random interval
+                    let base_interval = 1.0 / self.cars_config.simulation.spawn_rate;
+                    let entry_interval = self.cars_config.traffic_flow.entry_intervals
+                        .iter()
+                        .find(|ei| &ei.entry_id == entry_id);
+                    
+                    *timer = if let Some(interval) = entry_interval {
+                        self.rng.gen_range(interval.min_interval..=interval.max_interval)
+                    } else {
+                        base_interval // Use spawn_rate as default
+                    };
                 }
             }
         }
         
-        // Process spawn requests
-        for (_entry_id, entry) in spawn_requests {
+        // Process spawn requests and force gaps if needed
+        for (_entry_id, entry, natural_spawn) in spawn_requests {
+            if !natural_spawn {
+                // Need to force a gap before spawning
+                if !Self::force_spawn_gap(&entry, state, &self.route.route.geometry) {
+                    log::debug!("Could not force spawn gap at entry {}, skipping spawn", entry.id);
+                    continue;
+                }
+            }
             self.spawn_car_at_entry(&entry, state);
         }
     }
@@ -155,6 +160,81 @@ impl TrafficManager {
         
         log::debug!("Can spawn at entry {} - permissive check passed", entry.id);
         
+        true
+    }
+    
+    fn force_spawn_gap(
+        entry: &crate::config::EntryPoint,
+        state: &mut SimulationState,
+        route_geom: &crate::config::RouteGeometry
+    ) -> bool {
+        let entry_pos = Self::calculate_entry_position(entry, route_geom);
+        
+        // Find cars within the force gap zone
+        let force_gap_distance = 15.0; // meters - distance within which we'll force cars to slow down
+        let minimum_spawn_distance = 3.0; // meters - absolute minimum distance for spawning
+        
+        let mut cars_to_slow = Vec::new();
+        let mut closest_distance = f32::INFINITY;
+        
+        for car in &state.cars {
+            let distance = (car.position - entry_pos).magnitude();
+            
+            if distance < minimum_spawn_distance {
+                // Too close even for forced spawning
+                log::debug!("Cannot force spawn at entry {} - car too close even for forced spawning ({:.1}m < {:.1}m)", entry.id, distance, minimum_spawn_distance);
+                return false;
+            }
+            
+            if distance < force_gap_distance {
+                cars_to_slow.push(car.id);
+                closest_distance = closest_distance.min(distance);
+            }
+        }
+        
+        if cars_to_slow.is_empty() {
+            // No cars nearby, can spawn freely
+            log::debug!("Force spawn at entry {} - no cars to slow down", entry.id);
+            return true;
+        }
+        
+        let num_cars_to_slow = cars_to_slow.len();
+        let dt = state.dt; // Store dt value before borrowing state
+        
+        // Force nearby cars to slow down to create a gap
+        for car_id in &cars_to_slow {
+            if let Some(car) = state.get_car_mut(*car_id) {
+                // Calculate how much to slow down based on distance to spawn point
+                let car_distance = (car.position - entry_pos).magnitude();
+                let slowdown_factor = 1.0 - (car_distance / force_gap_distance).min(1.0);
+                
+                // Reduce target speed to create gap - more reduction for closer cars
+                let new_target_speed = car.behavior.target_speed * (0.3 + 0.7 * (1.0 - slowdown_factor));
+                car.behavior.target_speed = new_target_speed.max(2.0); // Minimum speed of 2 m/s
+                
+                // Apply immediate deceleration for very close cars
+                if car_distance < force_gap_distance * 0.6 {
+                    let deceleration_factor = 0.7; // 70% of max deceleration
+                    let max_decel = car.max_deceleration * deceleration_factor;
+                    let current_speed = car.velocity.magnitude();
+                    let decel_velocity_change = max_decel * dt;
+                    
+                    if current_speed > decel_velocity_change {
+                        let new_speed = current_speed - decel_velocity_change;
+                        car.velocity = car.velocity.normalize() * new_speed;
+                    } else {
+                        car.velocity = car.velocity.normalize() * 1.0; // Minimum movement
+                    }
+                    
+                    log::debug!("Applied immediate deceleration to car {} at distance {:.1}m from spawn point", car_id.0, car_distance);
+                }
+                
+                log::debug!("Forced car {} to slow down: speed {:.1} -> {:.1} m/s (distance: {:.1}m)", 
+                           car_id.0, car.behavior.target_speed / (0.3 + 0.7 * (1.0 - slowdown_factor)), car.behavior.target_speed, car_distance);
+            }
+        }
+        
+        log::info!("Force spawning at entry {} - slowed down {} cars (closest: {:.1}m)", entry.id, num_cars_to_slow, closest_distance);
         true
     }
     

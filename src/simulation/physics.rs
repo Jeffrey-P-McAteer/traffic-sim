@@ -87,6 +87,9 @@ impl PhysicsEngine {
         // Calculate desired speed based on traffic and behavior
         let mut target_speed = car.behavior.target_speed;
         
+        // Check if car is in a spawn zone and should yield
+        target_speed = self.check_spawn_zone_yielding(car, state, target_speed);
+        
         // Collision avoidance
         if let Some(distance) = front_distance {
             if distance < self.collision_avoidance.emergency_brake_distance {
@@ -188,6 +191,9 @@ impl PhysicsEngine {
         // Calculate desired speed based on traffic and behavior with driver profile acceleration
         let mut target_speed = self.calculate_driver_profile_target_speed(car, state);
         
+        // Check if car is in a spawn zone and should yield
+        target_speed = self.check_spawn_zone_yielding(car, state, target_speed);
+        
         // Collision avoidance
         if let Some(distance) = front_distance {
             if distance < self.collision_avoidance.emergency_brake_distance {
@@ -205,7 +211,7 @@ impl PhysicsEngine {
         }
         
         // Determine path type based on lane number
-        let (path_direction, new_position, new_velocity, heading) = self.calculate_cloverleaf_path(car, target_speed, dt);
+        let (_path_direction, new_position, new_velocity, heading) = self.calculate_cloverleaf_path(car, target_speed, dt);
         
         // Calculate acceleration vector
         let acceleration = if dt > 0.0 {
@@ -496,6 +502,71 @@ impl PhysicsEngine {
         } else {
             (closest_car, Some(closest_distance))
         }
+    }
+    
+    fn check_spawn_zone_yielding(&self, car: &Car, _state: &SimulationState, target_speed: f32) -> f32 {
+        // Check if this car is near any spawn points and should yield for incoming traffic
+        let route_geom = &self.route.route.geometry;
+        let spawn_yield_distance = 20.0; // Distance from spawn points where cars should yield
+        
+        for entry in &self.route.route.entries {
+            let entry_pos = match route_geom.geometry_type.as_str() {
+                "donut" => {
+                    let center = Point2::new(route_geom.center_x, route_geom.center_y);
+                    let angle_rad = entry.angle.to_radians();
+                    let radius = route_geom.inner_radius + (entry.lane as f32 - 1.0) * route_geom.lane_width + route_geom.lane_width / 2.0;
+                    center + Vector2::new(radius * angle_rad.cos(), radius * angle_rad.sin())
+                }
+                "cloverleaf" => {
+                    // Use the same logic as in traffic manager
+                    let highway_extent = 250.0;
+                    let lane_width = route_geom.lane_width;
+                    let highway_half_width = route_geom.highway_width.unwrap_or(40.0) / 2.0;
+                    let lane_separation = highway_half_width + 5.0;
+                    
+                    match entry.lane {
+                        1..=3 => {
+                            let lane_offset = ((entry.lane as i32) - 2) as f32 * lane_width;
+                            let x_pos = -lane_separation + lane_offset;
+                            Point2::new(x_pos, highway_extent)
+                        }
+                        4..=6 => {
+                            let lane_offset = ((entry.lane as i32) - 5) as f32 * lane_width;
+                            let x_pos = lane_separation + lane_offset;
+                            Point2::new(x_pos, -highway_extent)
+                        }
+                        7..=9 => {
+                            let lane_offset = ((entry.lane as i32) - 8) as f32 * lane_width;
+                            let y_pos = lane_separation + lane_offset;
+                            Point2::new(highway_extent, y_pos)
+                        }
+                        10..=12 => {
+                            let lane_offset = ((entry.lane as i32) - 11) as f32 * lane_width;
+                            let y_pos = -lane_separation + lane_offset;
+                            Point2::new(-highway_extent, y_pos)
+                        }
+                        _ => Point2::new(0.0, 0.0)
+                    }
+                }
+                _ => Point2::new(0.0, 0.0)
+            };
+            
+            let distance_to_spawn = (car.position - entry_pos).magnitude();
+            
+            // If car is close to spawn point and in same lane, apply yielding behavior
+            if distance_to_spawn < spawn_yield_distance && car.current_lane == entry.lane {
+                // Reduce speed based on proximity to spawn point
+                let proximity_factor = 1.0 - (distance_to_spawn / spawn_yield_distance).min(1.0);
+                let speed_reduction = 0.4 * proximity_factor; // Up to 40% speed reduction
+                let yielding_speed = target_speed * (1.0 - speed_reduction);
+                
+                log::debug!("Car {} yielding for spawn zone at distance {:.1}m, speed reduced from {:.1} to {:.1} m/s", 
+                           car.id.0, distance_to_spawn, target_speed, yielding_speed);
+                return yielding_speed.max(5.0); // Minimum speed of 5 m/s
+            }
+        }
+        
+        target_speed
     }
     
     fn calculate_following_distance(&self, car: &Car) -> f32 {
